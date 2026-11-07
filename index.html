@@ -1,0 +1,2950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PVC Cutting Cost Model & Customer Quote Calculator</title>
+  <style>
+    /* ==========================================================================
+       GLOBAL STYLES & RESET
+       ========================================================================== */
+    :root {
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: "Segoe UI Mono", SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      
+      /* Web Theme Colors */
+      --bg-app: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-sidebar: #ffffff;
+      --bg-subtle: #f1f5f9;
+      --border-color: #e2e8f0;
+      --border-strong: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --text-light: #94a3b8;
+      
+      --color-primary: #2563eb;
+      --color-primary-hover: #1d4ed8;
+      --color-primary-light: #eff6ff;
+      --color-success: #16a34a;
+      --color-success-light: #f0fdf4;
+      --color-warning: #d97706;
+      --color-warning-light: #fffbeb;
+      --color-danger: #dc2626;
+
+      /* Excel Theme Colors */
+      --excel-green: #107c41;
+      --excel-green-dark: #0b5c30;
+      --excel-header-dark: #1f4e78;
+      --excel-header-blue: #2f5597;
+      --excel-cell-yellow: #fff2cc;
+      --excel-cell-blue: #d9eaf7;
+      --excel-cell-green: #e2f0d9;
+      --excel-border: #d4d4d4;
+      --excel-grid: #e1dfdd;
+      --excel-header-gray: #f3f2f1;
+      
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+      --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.07), 0 1px 2px rgba(0, 0, 0, 0.04);
+      --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+      
+      --sidebar-width: 240px;
+      --sidebar-collapsed-width: 68px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg-app);
+      color: var(--text-main);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ==========================================================================
+       TOP VIEW SWITCHER BAR (Web View vs Excel View)
+       ========================================================================== */
+    .view-switcher-bar {
+      height: 44px;
+      background: #0f172a;
+      color: #f8fafc;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 1.25rem;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .view-switcher-left {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+    .badge-file {
+      background: rgba(255,255,255,0.15);
+      color: #cbd5e1;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 500;
+    }
+    .view-switcher-pill-group {
+      display: flex;
+      background: rgba(255,255,255,0.12);
+      padding: 3px;
+      border-radius: 20px;
+      gap: 3px;
+    }
+    .view-pill-btn {
+      border: none;
+      background: transparent;
+      color: #94a3b8;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 0.35rem 0.9rem;
+      border-radius: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: all 0.2s ease;
+    }
+    .view-pill-btn:hover { color: #ffffff; }
+    .view-pill-btn.active {
+      background: #2563eb;
+      color: #ffffff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+    .view-pill-btn.excel-mode.active {
+      background: var(--excel-green);
+    }
+
+    /* Small '?' Icon Pill */
+    .excel-ref-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #e2e8f0;
+      color: #475569;
+      font-size: 0.65rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-left: 0.35rem;
+      transition: all 0.15s ease;
+      vertical-align: middle;
+      border: 1px solid #cbd5e1;
+      user-select: none;
+    }
+    .excel-ref-pill:hover {
+      background: var(--color-primary);
+      color: #ffffff;
+      border-color: var(--color-primary);
+      transform: scale(1.1);
+    }
+
+    /* ==========================================================================
+       VIEW CONTAINER 1: MODERN WEB APP
+       ========================================================================== */
+    #web-app-wrapper {
+      display: flex;
+      min-height: calc(100vh - 44px);
+    }
+    .sidebar {
+      width: var(--sidebar-width);
+      background-color: var(--bg-sidebar);
+      border-right: 1px solid var(--border-color);
+      position: fixed;
+      top: 44px;
+      bottom: 0;
+      left: 0;
+      display: flex;
+      flex-direction: column;
+      z-index: 40;
+      transition: width 0.2s ease;
+    }
+    .sidebar.collapsed { width: var(--sidebar-collapsed-width); }
+    .sidebar-header {
+      height: 60px;
+      padding: 0 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .logo-area { display: flex; align-items: center; gap: 0.65rem; white-space: nowrap; }
+    .logo-icon {
+      width: 34px; height: 34px; border-radius: var(--radius-md);
+      background: var(--color-primary); color: white;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .logo-text { font-weight: 700; font-size: 1rem; color: var(--text-main); }
+    .sidebar.collapsed .logo-text { display: none; }
+    .btn-toggle-sidebar {
+      background: transparent; border: 1px solid var(--border-color);
+      color: var(--text-muted); width: 28px; height: 28px; border-radius: var(--radius-sm);
+      display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;
+    }
+    .btn-toggle-sidebar:hover { background: var(--bg-subtle); color: var(--text-main); }
+    
+    .sidebar-menu { padding: 1rem 0.65rem; flex: 1; display: flex; flex-direction: column; gap: 0.25rem; }
+    .menu-label {
+      font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--text-light); font-weight: 600; padding: 0.5rem 0.65rem 0.2rem;
+    }
+    .sidebar.collapsed .menu-label { display: none; }
+    .menu-link {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.6rem 0.65rem; border-radius: var(--radius-md);
+      color: var(--text-muted); text-decoration: none; font-size: 0.88rem; font-weight: 500;
+      cursor: pointer; transition: 0.15s ease; white-space: nowrap;
+    }
+    .menu-link svg { width: 18px; height: 18px; flex-shrink: 0; }
+    .menu-link:hover { background-color: var(--bg-subtle); color: var(--text-main); }
+    .menu-link.active {
+      background-color: var(--color-primary-light); color: var(--color-primary); font-weight: 600;
+    }
+    .sidebar.collapsed .menu-text { display: none; }
+    
+    .sidebar-footer {
+      padding: 0.85rem 1rem; border-top: 1px solid var(--border-color);
+      font-size: 0.72rem; color: var(--text-muted);
+    }
+    .sidebar.collapsed .sidebar-footer { display: none; }
+
+    /* Web Main Area */
+    .main-content {
+      flex: 1; margin-left: var(--sidebar-width); min-height: calc(100vh - 44px);
+      display: flex; flex-direction: column; transition: margin-left 0.2s ease;
+    }
+    .sidebar.collapsed ~ .main-content { margin-left: var(--sidebar-collapsed-width); }
+    
+    .top-header {
+      height: 60px; background-color: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color); padding: 0 1.5rem;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 44px; z-index: 30;
+    }
+    .header-title h1 { font-size: 1.1rem; font-weight: 700; color: var(--text-main); }
+    .header-title p { font-size: 0.72rem; color: var(--text-muted); }
+    .header-actions { display: flex; align-items: center; gap: 0.5rem; }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 0.45rem 0.85rem; border-radius: var(--radius-sm);
+      font-size: 0.82rem; font-weight: 600; border: 1px solid transparent;
+      cursor: pointer; transition: 0.15s ease; text-decoration: none;
+    }
+    .btn svg { width: 15px; height: 15px; }
+    .btn-primary { background-color: var(--color-primary); color: white; }
+    .btn-primary:hover { background-color: var(--color-primary-hover); }
+    .btn-secondary { background-color: var(--bg-surface); border-color: var(--border-strong); color: var(--text-main); }
+    .btn-secondary:hover { background-color: var(--bg-subtle); }
+    .btn-sm { padding: 0.3rem 0.55rem; font-size: 0.75rem; }
+
+    .page-container { padding: 1.25rem 1.5rem; flex: 1; }
+    .page-view { display: none; }
+    .page-view.active { display: block; }
+    
+    .card {
+      background: var(--bg-surface); border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg); padding: 1.15rem 1.35rem;
+      box-shadow: var(--shadow-card); margin-bottom: 1.15rem;
+    }
+    .card-title-row {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 0.85rem; padding-bottom: 0.65rem; border-bottom: 1px solid var(--border-color);
+    }
+    .card-title {
+      font-size: 0.92rem; font-weight: 700; color: var(--text-main);
+      display: flex; align-items: center; gap: 0.4rem;
+    }
+
+    /* Customer Bar */
+    .customer-bar {
+      background: var(--bg-surface); border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg); padding: 0.85rem 1.25rem;
+      margin-bottom: 1.15rem; box-shadow: var(--shadow-card);
+      display: grid; grid-template-columns: 1.2fr 1fr 1.5fr 1fr 0.7fr auto;
+      gap: 0.85rem; align-items: center;
+    }
+    .input-group { display: flex; flex-direction: column; gap: 0.2rem; }
+    .input-label {
+      font-size: 0.7rem; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.03em; display: flex; align-items: center;
+    }
+    .input-control {
+      width: 100%; padding: 0.45rem 0.65rem; border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm); font-size: 0.85rem; color: var(--text-main);
+      background: var(--bg-surface); outline: none; font-family: inherit;
+    }
+    .input-control:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
+
+    /* 2-Column Main Workspace */
+    .two-col-grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 1.15rem; align-items: start; }
+    .segmented-pills {
+      display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.35rem;
+      background: var(--bg-subtle); padding: 0.3rem; border-radius: var(--radius-md); margin-bottom: 0.85rem;
+    }
+    .seg-pill {
+      border: none; background: transparent; padding: 0.4rem 0.2rem;
+      border-radius: var(--radius-sm); font-size: 0.82rem; font-weight: 600;
+      color: var(--text-muted); cursor: pointer; text-align: center;
+    }
+    .seg-pill.active { background: var(--bg-surface); color: var(--color-primary); box-shadow: var(--shadow-sm); }
+    
+    .dims-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; margin-bottom: 0.85rem; }
+    .dim-field { background: var(--bg-subtle); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.75rem 0.85rem; }
+    .dim-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); }
+    .dim-stepper { display: flex; align-items: center; background: var(--bg-surface); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); overflow: hidden; }
+    .dim-input { width: 100%; border: none; padding: 0.4rem; font-size: 1.05rem; font-weight: 700; color: var(--text-main); text-align: center; outline: none; }
+    .dim-step-btn { background: transparent; border: none; width: 30px; height: 34px; font-size: 1.1rem; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .dim-step-btn:hover { background: var(--bg-subtle); color: var(--text-main); }
+    
+    .shape-selector-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.45rem; margin-bottom: 0.85rem; }
+    .shape-btn {
+      background: var(--bg-surface); border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md); padding: 0.65rem 0.4rem; display: flex;
+      flex-direction: column; align-items: center; gap: 0.35rem; cursor: pointer;
+    }
+    .shape-btn.active { border-color: var(--color-primary); background: var(--color-primary-light); color: var(--color-primary); }
+    .shape-btn svg { width: 24px; height: 24px; }
+    .shape-btn span { font-size: 0.72rem; font-weight: 600; }
+
+    .options-list { display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; margin-bottom: 0.65rem; }
+    .option-box {
+      background: var(--bg-surface); border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md); padding: 0.65rem 0.85rem; display: flex;
+      align-items: center; justify-content: space-between; cursor: pointer;
+    }
+    .option-box.active { border-color: var(--color-primary); background: var(--color-primary-light); }
+    .option-text h4 { font-size: 0.82rem; font-weight: 600; color: var(--text-main); }
+    .option-text span { font-size: 0.7rem; color: var(--color-success); font-weight: 600; }
+
+    .alert-box { padding: 0.55rem 0.85rem; border-radius: var(--radius-sm); font-size: 0.8rem; display: flex; align-items: center; justify-content: space-between; margin-top: 0.65rem; }
+    .alert-box.success { background: var(--color-success-light); border: 1px solid #bbf7d0; color: var(--color-success); }
+    .alert-box.warning { background: var(--color-warning-light); border: 1px solid #fde68a; color: var(--color-warning); }
+
+    /* Right Column: Hero Price & Breakdown */
+    .hero-price-box {
+      background: linear-gradient(135deg, #1e3a8a, #2563eb);
+      color: white; border-radius: var(--radius-lg); padding: 1.25rem;
+      margin-bottom: 0.85rem; box-shadow: 0 4px 12px rgba(37,99,235,0.25);
+    }
+    .hero-price-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.85; margin-bottom: 0.2rem; display: flex; align-items: center; }
+    .hero-price-val { font-size: 2.2rem; font-weight: 800; line-height: 1.1; letter-spacing: -0.02em; }
+    .hero-price-sub { font-size: 0.82rem; opacity: 0.9; margin-top: 0.3rem; display: flex; justify-content: space-between; }
+    
+    .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem; margin-bottom: 0.85rem; }
+    .metric-pill { background: var(--bg-subtle); border-radius: var(--radius-md); padding: 0.55rem 0.75rem; }
+    .metric-pill .lbl { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; display: flex; align-items: center; }
+    .metric-pill .val { font-size: 0.95rem; font-weight: 700; color: var(--text-main); }
+    
+    .simple-breakdown-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .simple-breakdown-table tr { border-bottom: 1px solid var(--border-color); }
+    .simple-breakdown-table tr:last-child { border-bottom: none; }
+    .simple-breakdown-table td { padding: 0.5rem 0.15rem; color: var(--text-muted); }
+    .simple-breakdown-table td.num { text-align: right; font-weight: 600; color: var(--text-main); }
+    .simple-breakdown-table tr.total-line td { font-size: 0.92rem; font-weight: 700; color: var(--color-primary); padding-top: 0.65rem; }
+
+    /* Modals */
+    .modal-backdrop {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15,23,42,0.45); backdrop-filter: blur(4px);
+      z-index: 2000; display: none; align-items: center; justify-content: center; padding: 1rem;
+    }
+    .modal-backdrop.active { display: flex; }
+    .modal-sheet {
+      background: var(--bg-surface); border-radius: var(--radius-lg);
+      width: 100%; max-width: 780px; max-height: 85vh; display: flex; flex-direction: column;
+      box-shadow: var(--shadow-lg); overflow: hidden;
+    }
+    .modal-top { padding: 0.85rem 1.25rem; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; }
+    .modal-top h2 { font-size: 1.05rem; font-weight: 700; }
+    .modal-close { background: transparent; border: none; font-size: 1.25rem; color: var(--text-muted); cursor: pointer; }
+    .modal-scrollable { padding: 1.15rem 1.25rem; overflow-y: auto; flex: 1; }
+    .modal-bottom { padding: 0.75rem 1.25rem; border-top: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; background: var(--bg-subtle); }
+    
+    .form-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; }
+    .param-box { background: var(--bg-subtle); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.65rem 0.85rem; }
+    .param-box label { display: flex; justify-content: space-between; font-size: 0.78rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.3rem; }
+    .param-box input { width: 100%; padding: 0.35rem 0.55rem; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-size: 0.85rem; outline: none; }
+    .param-box p { font-size: 0.68rem; color: var(--text-muted); margin-top: 0.2rem; }
+
+    .clean-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .clean-table th { background: var(--bg-subtle); padding: 0.55rem 0.75rem; text-align: left; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border-color); }
+    .clean-table td { padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--border-color); color: var(--text-main); }
+
+    /* ==========================================================================
+       VIEW CONTAINER 2: EXCEL SPREADSHEET REPLICA VIEW
+       ========================================================================== */
+    #excel-replica-wrapper {
+      display: none;
+      flex-direction: column;
+      height: calc(100vh - 44px);
+      background: #ffffff;
+      color: #000000;
+      font-family: Calibri, "Segoe UI", Arial, sans-serif;
+      font-size: 11pt;
+      overflow: hidden;
+    }
+    #excel-replica-wrapper.active {
+      display: flex;
+    }
+
+    /* Excel Ribbon Header Bar */
+    .excel-top-ribbon {
+      background: var(--excel-green);
+      color: white;
+      height: 48px;
+      padding: 0 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--excel-green-dark);
+      flex-shrink: 0;
+    }
+    .excel-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+    .excel-sheet-sync-pill {
+      background: rgba(255,255,255,0.2);
+      font-size: 0.75rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+    .excel-formula-bar-container {
+      height: 32px;
+      background: #ffffff;
+      border-bottom: 1px solid var(--excel-border);
+      display: flex;
+      align-items: center;
+      padding: 0 0.5rem;
+      flex-shrink: 0;
+      gap: 0.5rem;
+    }
+    .excel-name-box {
+      width: 70px;
+      height: 24px;
+      border: 1px solid var(--excel-border);
+      border-radius: 2px;
+      padding: 0 0.4rem;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      background: #fbfbfb;
+    }
+    .excel-fx-icon {
+      font-family: "Cambria Math", serif;
+      font-style: italic;
+      font-weight: 700;
+      color: #707070;
+      font-size: 13px;
+      user-select: none;
+    }
+    .excel-formula-input {
+      flex: 1;
+      height: 24px;
+      border: 1px solid transparent;
+      padding: 0 0.4rem;
+      font-family: Calibri, var(--font-mono), sans-serif;
+      font-size: 12px;
+      outline: none;
+    }
+    .excel-formula-input:focus {
+      border-color: var(--excel-green);
+      background: #fafafa;
+    }
+
+    /* Excel Top Worksheet Tabs Strip */
+    .excel-top-tabs-bar {
+      background: #edebe9;
+      border-bottom: 2px solid #d2d0ce;
+      display: flex;
+      align-items: center;
+      padding: 0 0.75rem;
+      gap: 0.75rem;
+      flex-shrink: 0;
+      height: 44px;
+      user-select: none;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .excel-tabs-header-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #605e5c;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+    }
+    .excel-top-tab-list {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+    }
+    .excel-top-tabs-bar .excel-tab-btn {
+      padding: 0.4rem 0.95rem;
+      font-size: 11px;
+      font-weight: 600;
+      color: #323130;
+      border: 1px solid #d2d0ce;
+      border-radius: 4px;
+      background: #ffffff;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .excel-top-tabs-bar .excel-tab-btn:hover {
+      background: #f3f2f1;
+      color: #107c41;
+      border-color: #107c41;
+    }
+    .excel-top-tabs-bar .excel-tab-btn.active {
+      background: #107c41 !important;
+      color: #ffffff !important;
+      border-color: #0b5c30 !important;
+      font-weight: 700;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+    }
+    .excel-top-tabs-bar .sheet-tab-icon { font-size: 13px; }
+    .excel-top-tabs-bar .sheet-tab-badge {
+      font-size: 9px;
+      padding: 0.1rem 0.4rem;
+      border-radius: 8px;
+      background: rgba(0,0,0,0.06);
+      font-weight: 600;
+    }
+    .excel-top-tabs-bar .excel-tab-btn.active .sheet-tab-badge {
+      background: rgba(255,255,255,0.25);
+      color: #ffffff;
+    }
+
+    /* Excel Grid Viewport with min-height: 0 so flex child scrolls properly and doesn't push bottom bar */
+    .excel-sheet-viewport {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      background: #f8f9fa;
+      position: relative;
+    }
+
+    /* Multi-sheet block titles */
+    .excel-sheet-block {
+      background: #ffffff;
+      border: 1px solid #d4d4d4;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      margin-bottom: 2rem;
+    }
+    .excel-sheet-block-title {
+      background: #1f4e78;
+      color: #ffffff;
+      padding: 0.6rem 1rem;
+      font-weight: 700;
+      font-size: 11pt;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .excel-grid-table {
+      border-collapse: collapse;
+      table-layout: fixed;
+      background: #ffffff;
+      font-size: 10pt;
+      cursor: cell;
+      user-select: none;
+    }
+    .excel-grid-table th, .excel-grid-table td {
+      border: 1px solid var(--excel-grid);
+      height: 24px;
+      padding: 0 6px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+
+    /* Row & Column Headers */
+    .excel-col-hdr {
+      background: var(--excel-header-gray);
+      color: #444;
+      text-align: center;
+      font-weight: 600;
+      font-size: 10px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      border-bottom: 1px solid #bfbfbf !important;
+      border-right: 1px solid #d4d4d4 !important;
+    }
+    .excel-row-hdr {
+      background: var(--excel-header-gray);
+      color: #444;
+      text-align: center;
+      font-weight: 600;
+      font-size: 10px;
+      width: 44px;
+      position: sticky;
+      left: 0;
+      z-index: 10;
+      border-right: 1px solid #bfbfbf !important;
+      border-bottom: 1px solid #d4d4d4 !important;
+    }
+    .excel-corner-cell {
+      position: sticky;
+      top: 0;
+      left: 0;
+      z-index: 20;
+      background: var(--excel-header-gray);
+      border-right: 1px solid #bfbfbf !important;
+      border-bottom: 1px solid #bfbfbf !important;
+    }
+
+    /* Spreadsheet Cell Styling Classes (Faithful to Excel Workbook) */
+    .xl-title-navy {
+      background-color: var(--excel-header-dark) !important;
+      color: #ffffff !important;
+      font-weight: bold !important;
+      font-size: 11pt !important;
+    }
+    .xl-sec-hdr {
+      background-color: var(--excel-header-blue) !important;
+      color: #ffffff !important;
+      font-weight: bold !important;
+      font-size: 10pt !important;
+    }
+    .xl-input-yellow {
+      background-color: var(--excel-cell-yellow) !important;
+      color: #000000 !important;
+      font-weight: 500;
+      cursor: text !important;
+    }
+    .xl-input-yellow:hover {
+      box-shadow: inset 0 0 0 1px #d4a017;
+    }
+    .xl-calc-blue {
+      background-color: var(--excel-cell-blue) !important;
+      color: #000000 !important;
+      font-weight: 500;
+    }
+    .xl-sum-green {
+      background-color: var(--excel-cell-green) !important;
+      color: #000000 !important;
+      font-weight: bold !important;
+    }
+    .xl-num { text-align: right; }
+    .xl-center { text-align: center; }
+    .xl-bold { font-weight: bold; }
+    .xl-desc { color: #595959; font-style: italic; }
+
+    /* Active Selected Cell Border */
+    .excel-grid-table td.selected {
+      outline: 2px solid var(--excel-green) !important;
+      outline-offset: -1px;
+      z-index: 5;
+      position: relative;
+    }
+
+    /* Excel Bottom Sheet Tabs Bar */
+    .excel-bottom-tabs-bar {
+      height: 36px;
+      background: #f3f2f1;
+      border-top: 1px solid var(--excel-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 0.5rem;
+      flex-shrink: 0;
+    }
+    .excel-tab-list {
+      display: flex;
+      align-items: flex-end;
+      height: 100%;
+      gap: 2px;
+    }
+    .excel-bottom-tabs-bar .excel-tab-btn {
+      padding: 0.35rem 1rem;
+      font-size: 11px;
+      font-weight: 600;
+      color: #444;
+      border: 1px solid transparent;
+      border-bottom: none;
+      border-radius: 4px 4px 0 0;
+      background: transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .excel-bottom-tabs-bar .excel-tab-btn:hover { background: #e5e5e5; }
+    .excel-bottom-tabs-bar .excel-tab-btn.active {
+      background: #ffffff !important;
+      color: var(--excel-green) !important;
+      border-color: var(--excel-border) !important;
+      border-bottom: 2px solid var(--excel-green) !important;
+      font-weight: 700;
+      box-shadow: none !important;
+    }
+    .excel-status-info {
+      font-size: 11px;
+      color: #666;
+      display: flex;
+      gap: 1rem;
+    }
+
+    /* ==========================================================================
+       EXCEL REFERENCE DETAIL POPUP / TOOLTIP MODAL
+       ========================================================================== */
+    .excel-ref-modal {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15,23,42,0.4);
+      backdrop-filter: blur(2px);
+      z-index: 3000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .excel-ref-modal.active { display: flex; }
+    .excel-ref-card {
+      background: #ffffff;
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 520px;
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+      animation: popIn 0.15s ease;
+    }
+    @keyframes popIn {
+      from { transform: scale(0.95); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    .excel-ref-header {
+      background: #1f4e78;
+      color: white;
+      padding: 0.85rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .excel-ref-body {
+      padding: 1.25rem;
+    }
+    .ref-meta-row {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .ref-badge {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 0.4rem 0.65rem;
+      font-size: 0.78rem;
+    }
+    .ref-badge strong { color: var(--color-primary); }
+    .ref-formula-box {
+      background: #f8fafc;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: #0f172a;
+      margin-bottom: 0.85rem;
+      word-break: break-all;
+    }
+    .ref-desc-text {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+      margin-bottom: 1.25rem;
+    }
+    .excel-ref-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1.25rem;
+      background: var(--bg-subtle);
+      border-top: 1px solid var(--border-color);
+    }
+
+    /* Simple Toast */
+    .toast-box {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      background: #0f172a;
+      color: white;
+      padding: 0.65rem 1.15rem;
+      border-radius: var(--radius-md);
+      font-size: 0.82rem;
+      box-shadow: var(--shadow-lg);
+      z-index: 4000;
+      display: none;
+    }
+
+    /* Print View */
+    @media print {
+      .view-switcher-bar, .sidebar, .top-header, .header-actions, .modal-backdrop, .excel-ref-pill, .no-print, #excel-replica-wrapper {
+        display: none !important;
+      }
+      .main-content { margin-left: 0 !important; }
+      .page-view { display: none !important; }
+      #view-quote-preview { display: block !important; }
+    }
+    @media (max-width: 900px) {
+      .two-col-grid { grid-template-columns: 1fr; }
+      .customer-bar { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ======================================================================
+       TOP SWITCHER BAR: WEB APP VIEW <---> EXCEL SPREADSHEET VIEW
+       ====================================================================== -->
+  <header class="view-switcher-bar">
+    <div class="view-switcher-left">
+      <span>PVC Cutting Cost Calculator</span>
+      <span class="badge-file">260929 Table Cover Surface Protection Calculator ver 2.xlsx</span>
+    </div>
+
+    <!-- Toggle Switcher: Modern Web Style vs Authentic Excel Style -->
+    <div class="view-switcher-pill-group">
+      <button type="button" class="view-pill-btn active" id="btn-switch-web-mode" title="Switch to Modern Web App Dashboard">
+        <span>🌐 Modern Web View</span>
+      </button>
+      <button type="button" class="view-pill-btn excel-mode" id="btn-switch-excel-mode" title="Switch to Authentic Excel Spreadsheet View with Tabs">
+        <span>📊 Excel Sheet View</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ======================================================================
+       CONTAINER 1: MODERN WEB APP DASHBOARD (DEFAULT ACTIVE VIEW)
+       ====================================================================== -->
+  <div id="web-app-wrapper">
+
+    <!-- Collapsible Sidebar -->
+    <aside class="sidebar" id="app-sidebar">
+      <div class="sidebar-header">
+        <div class="logo-area">
+          <div class="logo-icon">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="18" height="18">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+            </svg>
+          </div>
+          <span class="logo-text">CutCost Pro</span>
+        </div>
+        <button class="btn-toggle-sidebar" id="sidebar-toggle-btn" title="Toggle Sidebar">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="14" height="14">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Navigation Links -->
+      <nav class="sidebar-menu">
+        <div class="menu-label">Main Menu</div>
+        <a class="menu-link active" data-view="dashboard">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+          </svg>
+          <span class="menu-text">Quote Calculator</span>
+        </a>
+
+        <a class="menu-link" data-view="quotes-history">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+          </svg>
+          <span class="menu-text">Saved Quotes</span>
+        </a>
+
+        <div class="menu-label">Infrequent Assumptions</div>
+        <a class="menu-link" data-view="cost-model">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+          </svg>
+          <span class="menu-text">Cutting Cost Model</span>
+        </a>
+
+        <a class="menu-link" data-view="parameters">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+          </svg>
+          <span class="menu-text">Box & Surcharges</span>
+        </a>
+
+        <div class="menu-label">Output</div>
+        <a class="menu-link" data-view="quote-preview">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+          </svg>
+          <span class="menu-text">Print Quote</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div>Workbook: <strong>Calculator ver 2</strong></div>
+        <div>Default Margin: <strong>40%</strong></div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+
+      <!-- Top Header -->
+      <header class="top-header">
+        <div class="header-title">
+          <h1>PVC Surface Protection Calculator</h1>
+          <p>Digital Cutting Cost Model & Customer Quoting</p>
+        </div>
+
+        <div class="header-actions">
+          <button class="btn btn-secondary btn-open-cost-model" title="Open Cost Model Modal">
+            <span>⚙️ Edit Cost Model</span>
+          </button>
+          <button class="btn btn-secondary btn-open-box-rules" title="View Packaging Rules">
+            <span>Box Rules</span>
+          </button>
+          <button class="btn btn-primary" id="btn-save-quote" title="Save this quote under current customer code">
+            <span>💾 Save Quote</span>
+          </button>
+          <button class="btn btn-secondary" id="btn-print-quote" title="Print this quotation">
+            <span>🖨️ Print</span>
+          </button>
+          <button class="btn btn-secondary" id="btn-reset-defaults" title="Reset all back to default values">
+            <span>🔄 Reset</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="page-container">
+
+        <!-- ================================================================
+             VIEW 1: QUOTE DASHBOARD
+             ================================================================ -->
+        <div class="page-view active" id="view-dashboard">
+
+          <!-- Customer Code Bar -->
+          <div class="customer-bar">
+            <div class="input-group">
+              <label class="input-label">
+                Select Customer
+                <span class="excel-ref-pill" data-ref-key="customerCode" title="Excel location info">?</span>
+              </label>
+              <select class="input-control" id="customer-code-select"></select>
+            </div>
+
+            <div class="input-group">
+              <label class="input-label">Customer Code</label>
+              <input type="text" class="input-control" id="customer-code-input" value="CUST-1001" style="font-weight:700;color:var(--color-primary);">
+            </div>
+
+            <div class="input-group">
+              <label class="input-label">Customer Name</label>
+              <input type="text" class="input-control" id="customer-name-input" value="Acme Surfaces & Design">
+            </div>
+
+            <div class="input-group">
+              <label class="input-label">Quote #</label>
+              <input type="text" class="input-control" id="quote-id-input" value="QT-2026-0101">
+            </div>
+
+            <div class="input-group">
+              <label class="input-label">Qty</label>
+              <input type="number" min="1" step="1" class="input-control" id="quote-quantity-input" value="1" style="font-weight:700;text-align:center;">
+            </div>
+
+            <input type="hidden" id="quote-date-input">
+
+            <div>
+              <button class="btn btn-secondary btn-sm" id="btn-new-customer" title="Add New Customer Code">
+                + New
+              </button>
+            </div>
+          </div>
+
+          <!-- Main 2-Column Split: Inputs & Results -->
+          <div class="two-col-grid">
+
+            <!-- LEFT COLUMN: Major Cut Parameters -->
+            <div>
+              <div class="card">
+                <div class="card-title-row">
+                  <div class="card-title">
+                    <span>Cut Part Specifications</span>
+                  </div>
+                  <span style="font-size:0.75rem;color:var(--text-muted);">Major frequent parameters</span>
+                </div>
+
+                <!-- 1. Thickness -->
+                <div style="margin-bottom:1rem;">
+                  <label class="input-label" style="margin-bottom:0.35rem;">
+                    1. Sheet Thickness (mm)
+                    <span class="excel-ref-pill" data-ref-key="thickness" title="Click to see Excel cell & formula">?</span>
+                  </label>
+                  <div class="segmented-pills thickness-pills">
+                    <button type="button" class="seg-pill active" data-thickness="2">2 mm</button>
+                    <button type="button" class="seg-pill" data-thickness="3">3 mm</button>
+                    <button type="button" class="seg-pill" data-thickness="4">4 mm</button>
+                    <button type="button" class="seg-pill" data-thickness="5">5 mm</button>
+                    <button type="button" class="seg-pill" data-thickness="6">6 mm</button>
+                    <button type="button" class="seg-pill" data-thickness="7">7 mm</button>
+                  </div>
+                </div>
+
+                <!-- 2. Dimensions -->
+                <div style="margin-bottom:1rem;">
+                  <label class="input-label" style="margin-bottom:0.35rem;">2. Finished Dimensions (Inches)</label>
+                  <div class="dims-row">
+                    <!-- Width -->
+                    <div class="dim-field">
+                      <div class="dim-header">
+                        <span>Width (in) <span class="excel-ref-pill" data-ref-key="width" title="Excel reference">?</span></span>
+                      </div>
+                      <div class="dim-stepper">
+                        <button type="button" class="dim-step-btn step-btn" data-target="part-width-input" data-step="-1">−</button>
+                        <input type="number" min="1" max="240" step="0.5" class="dim-input" id="part-width-input" value="38">
+                        <button type="button" class="dim-step-btn step-btn" data-target="part-width-input" data-step="1">+</button>
+                      </div>
+                      <input type="range" min="12" max="120" step="0.5" id="part-width-slider" value="38" style="display:none;">
+                    </div>
+
+                    <!-- Length -->
+                    <div class="dim-field">
+                      <div class="dim-header">
+                        <span>Length (in) <span class="excel-ref-pill" data-ref-key="length" title="Excel reference">?</span></span>
+                      </div>
+                      <div class="dim-stepper">
+                        <button type="button" class="dim-step-btn step-btn" data-target="part-length-input" data-step="-1">−</button>
+                        <input type="number" min="1" max="300" step="0.5" class="dim-input" id="part-length-input" value="92">
+                        <button type="button" class="dim-step-btn step-btn" data-target="part-length-input" data-step="1">+</button>
+                      </div>
+                      <input type="range" min="12" max="180" step="0.5" id="part-length-slider" value="92" style="display:none;">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 3. Shape -->
+                <div style="margin-bottom:1rem;">
+                  <label class="input-label" style="margin-bottom:0.35rem;">
+                    3. Cover Shape
+                    <span class="excel-ref-pill" data-ref-key="shape" title="Excel reference">?</span>
+                  </label>
+                  <div class="shape-selector-grid">
+                    <div class="shape-btn shape-card active" data-shape="Square/Rectangle">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="5" width="18" height="14" rx="2"/>
+                      </svg>
+                      <span>Rectangle</span>
+                    </div>
+
+                    <div class="shape-btn shape-card" data-shape="Round">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="9"/>
+                      </svg>
+                      <span>Round</span>
+                    </div>
+
+                    <div class="shape-btn shape-card" data-shape="Oval">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <ellipse cx="12" cy="12" rx="10" ry="7"/>
+                      </svg>
+                      <span>Oval</span>
+                    </div>
+
+                    <div class="shape-btn shape-card" data-shape="Ellipse">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <ellipse cx="12" cy="12" rx="10" ry="5"/>
+                      </svg>
+                      <span>Ellipse</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 4. Finishing Options -->
+                <div style="margin-bottom:0.75rem;">
+                  <label class="input-label" style="margin-bottom:0.35rem;">4. Finishing & Edge Treatment</label>
+                  <div class="options-list">
+                    <label class="option-box option-toggle-card">
+                      <div class="option-text">
+                        <h4>Rounded Angles <span class="excel-ref-pill" data-ref-key="roundAngles" title="Excel reference">?</span></h4>
+                        <span>+$2.50 surcharge</span>
+                      </div>
+                      <input type="checkbox" id="toggle-round-angles" style="width:18px;height:18px;accent-color:var(--color-primary);cursor:pointer;">
+                    </label>
+
+                    <label class="option-box option-toggle-card active">
+                      <div class="option-text">
+                        <h4>Beveled Edges <span class="excel-ref-pill" data-ref-key="bevelEdges" title="Excel reference">?</span></h4>
+                        <span>+$4.00 surcharge</span>
+                      </div>
+                      <input type="checkbox" id="toggle-bevel-edges" checked style="width:18px;height:18px;accent-color:var(--color-primary);cursor:pointer;">
+                    </label>
+                  </div>
+                </div>
+
+                <!-- Validation Notice -->
+                <div id="validation-alert" class="alert-box success">
+                  <span>
+                    <strong>Dimension Check: OK</strong> - Geometry verified.
+                    <span class="excel-ref-pill" data-ref-key="dimCheck" title="Excel reference">?</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- RIGHT COLUMN: Results & Simple Breakdown -->
+            <div>
+              <!-- Hero Selling Price Card -->
+              <div class="hero-price-box">
+                <div class="hero-price-label">
+                  Calculated Selling Price
+                  <span class="excel-ref-pill" data-ref-key="sellingPrice" title="Excel reference" style="background:rgba(255,255,255,0.25);color:white;border-color:rgba(255,255,255,0.4);">?</span>
+                </div>
+                <div class="hero-price-val" id="kpi-selling-price">$39.40</div>
+                <div class="hero-price-sub">
+                  <span>
+                    <span id="kpi-price-sqm">$17.47 / sqm</span>
+                    <span class="excel-ref-pill" data-ref-key="sellingPriceSqm" title="Excel reference" style="background:rgba(255,255,255,0.25);color:white;border-color:rgba(255,255,255,0.4);">?</span>
+                  </span>
+                  <span>Total: <strong id="kpi-total-order-price">$39.40</strong></span>
+                </div>
+              </div>
+
+              <!-- 4 Metrics Badges -->
+              <div class="metrics-grid">
+                <div class="metric-pill">
+                  <span class="lbl">
+                    SQM of PVC Used
+                    <span class="excel-ref-pill" data-ref-key="sqmUsed" title="Excel reference">?</span>
+                  </span>
+                  <span class="val" id="kpi-sqm-used">2.255 sqm</span>
+                </div>
+                <div class="metric-pill">
+                  <span class="lbl">
+                    Roll Length
+                    <span class="excel-ref-pill" data-ref-key="rollLength" title="Excel reference">?</span>
+                  </span>
+                  <span class="val" id="kpi-roll-length">38.0 in</span>
+                </div>
+                <div class="metric-pill">
+                  <span class="lbl">
+                    Auto Box Selected
+                    <span class="excel-ref-pill" data-ref-key="selectedBox" title="Excel reference">?</span>
+                  </span>
+                  <span class="val" id="kpi-box-name" style="font-size:0.88rem;">42" x 6" x 6"</span>
+                  <span style="font-size:0.72rem;color:var(--text-muted);display:block;">Cost: <strong id="kpi-box-cost">$2.58</strong></span>
+                </div>
+                <div class="metric-pill">
+                  <span class="lbl">
+                    Production Cost
+                    <span class="excel-ref-pill" data-ref-key="preMarginCost" title="Excel reference">?</span>
+                  </span>
+                  <span class="val" id="kpi-pre-margin-cost">$26.18</span>
+                  <span style="font-size:0.72rem;color:var(--color-success);display:block;">Margin: <strong id="kpi-margin-amount">+$9.22</strong></span>
+                </div>
+              </div>
+
+              <!-- Cost Breakdown Table -->
+              <div class="card" style="padding:1rem 1.25rem;">
+                <div class="card-title-row" style="margin-bottom:0.4rem;padding-bottom:0.4rem;">
+                  <span style="font-size:0.85rem;font-weight:700;">Cost & Margin Breakdown</span>
+                </div>
+                <table class="simple-breakdown-table">
+                  <tr>
+                    <td>
+                      Raw PVC Material (incl. 20% waste)
+                      <span class="excel-ref-pill" data-ref-key="rawMaterialJob" title="Excel reference">?</span>
+                    </td>
+                    <td class="num" id="bd-raw-pvc">$19.90</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      Labor (Handling, Startup, Packing)
+                      <span class="excel-ref-pill" data-ref-key="totalLabor" title="Excel reference">?</span>
+                    </td>
+                    <td class="num" id="bd-labor">$2.10</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      Machine Cutting Cost
+                      <span class="excel-ref-pill" data-ref-key="cuttingCost" title="Excel reference">?</span>
+                    </td>
+                    <td class="num" id="bd-cutting">$0.60</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      Packaging Materials (Box + $1 allowance)
+                      <span class="excel-ref-pill" data-ref-key="packingMatCost" title="Excel reference">?</span>
+                    </td>
+                    <td class="num" id="bd-packing-mat">$3.58</td>
+                  </tr>
+                  <tr style="border-top:1px dashed var(--border-color);">
+                    <td>
+                      <strong>Total Cost Before Margins</strong>
+                      <span class="excel-ref-pill" data-ref-key="preMarginCost" title="Excel reference">?</span>
+                    </td>
+                    <td class="num" id="bd-pre-margin"><strong>$26.18</strong></td>
+                  </tr>
+                  <tr>
+                    <td>
+                      General Margin (40% cumulative)
+                      <span class="excel-ref-pill" data-ref-key="genMarginAmt" title="Excel reference">?</span>
+                    </td>
+                    <td class="num" id="bd-general-margin" style="color:var(--color-success);">+$9.04</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      Packaging Markup (5%)
+                      <span class="excel-ref-pill" data-ref-key="packMarginAmt" title="Excel reference">?</span>
+                    </td>
+                    <td class="num" id="bd-packing-margin" style="color:var(--color-success);">+$0.18</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      Fixed Surcharges (Finishing & Shape)
+                      <span class="excel-ref-pill" data-ref-key="totalSurcharges" title="Excel reference">?</span>
+                    </td>
+                    <td class="num" id="bd-surcharges" style="color:var(--color-primary);">+$4.00</td>
+                  </tr>
+                  <tr class="total-line">
+                    <td>
+                      FINAL UNIT SELLING PRICE
+                      <span class="excel-ref-pill" data-ref-key="sellingPrice" title="Excel reference">?</span>
+                    </td>
+                    <td class="num" id="bd-final-selling-price">$39.40</td>
+                  </tr>
+                </table>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- ================================================================
+             VIEW 2: CUTTING COST MODEL (INFREQUENT ASSUMPTIONS)
+             ================================================================ -->
+        <div class="page-view" id="view-cost-model">
+          <div class="card">
+            <div class="card-title-row">
+              <div class="card-title">Cutting Cost Model Assumptions</div>
+              <div style="display:flex;gap:0.5rem;">
+                <button class="btn btn-sm btn-secondary btn-reset-cost-model">Reset Assumptions</button>
+                <button class="btn btn-sm btn-primary" onclick="window.historyNavTo('dashboard')">Done & Return</button>
+              </div>
+            </div>
+            <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:1.25rem;">
+              These are infrequent procurement and industrial assumptions. Click any '?' to see its spreadsheet cell.
+            </p>
+
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;background:var(--bg-subtle);padding:0.75rem;border-radius:var(--radius-md);margin-bottom:1.25rem;">
+              <div>
+                <span style="font-size:0.7rem;color:var(--text-muted);display:block;">
+                  Transport / SQM <span class="excel-ref-pill" data-ref-key="transPerSqm">?</span>
+                </span>
+                <strong id="cm-prev-trans" style="font-size:0.95rem;color:var(--color-primary);">$1.357 / sqm</strong>
+              </div>
+              <div>
+                <span style="font-size:0.7rem;color:var(--text-muted);display:block;">
+                  Raw Ex Works <span class="excel-ref-pill" data-ref-key="rawExWorks">?</span>
+                </span>
+                <strong id="cm-prev-exworks" style="font-size:0.95rem;">$5.124 / sqm</strong>
+              </div>
+              <div>
+                <span style="font-size:0.7rem;color:var(--text-muted);display:block;">
+                  Raw Landed <span class="excel-ref-pill" data-ref-key="rawLanded">?</span>
+                </span>
+                <strong id="cm-prev-landed" style="font-size:0.95rem;">$7.352 / sqm</strong>
+              </div>
+              <div>
+                <span style="font-size:0.7rem;color:var(--text-muted);display:block;">
+                  Total Raw / SQM <span class="excel-ref-pill" data-ref-key="rawTotalSqm">?</span>
+                </span>
+                <strong id="cm-prev-total-sqm" style="font-size:0.95rem;color:var(--color-success);">$8.823 / sqm</strong>
+              </div>
+            </div>
+
+            <div class="form-two-col">
+              <div class="param-box">
+                <label>Raw PVC Cost ($/kg) <span class="excel-ref-pill" data-ref-key="rawPvcCost">?</span></label>
+                <input type="number" step="0.05" data-cm-field="rawPvcCost" value="2.10">
+                <p>Base resin material cost per kg.</p>
+              </div>
+
+              <div class="param-box">
+                <label>PVC Density Factor (kg/sqm/mm) <span class="excel-ref-pill" data-ref-key="densityFactor">?</span></label>
+                <input type="number" step="0.01" data-cm-field="densityFactor" value="1.22">
+                <p>Density multiplier per mm thickness.</p>
+              </div>
+
+              <div class="param-box">
+                <label>SQM / Container <span class="excel-ref-pill" data-ref-key="sqmPerContainer">?</span></label>
+                <input type="number" step="100" data-cm-field="sqmPerContainer" value="7000">
+                <p>Freight allocation divisor.</p>
+              </div>
+
+              <div class="param-box">
+                <label>Transportation Cost ($/container) <span class="excel-ref-pill" data-ref-key="transportCost">?</span></label>
+                <input type="number" step="100" data-cm-field="transportCost" value="9500">
+                <p>Ocean container shipping cost.</p>
+              </div>
+
+              <div class="param-box">
+                <label>Import Tariff (% decimal) <span class="excel-ref-pill" data-ref-key="tariff">?</span></label>
+                <input type="number" step="0.01" data-cm-field="tariff" value="0.17">
+                <p>17% tariff applied to Ex Works material.</p>
+              </div>
+
+              <div class="param-box">
+                <label>Scrap / Waste Allowance (% decimal) <span class="excel-ref-pill" data-ref-key="waste">?</span></label>
+                <input type="number" step="0.01" data-cm-field="waste" value="0.20">
+                <p>20% allowance on landed raw material.</p>
+              </div>
+
+              <div class="param-box">
+                <label>Hourly Labor Rate ($/hr) <span class="excel-ref-pill" data-ref-key="laborCost">?</span></label>
+                <input type="number" step="1" data-cm-field="laborCost" value="30.00">
+                <p>Standard fabrication labor rate.</p>
+              </div>
+
+              <div class="param-box">
+                <label>Handling Time (hr/job) <span class="excel-ref-pill" data-ref-key="handlingTime">?</span></label>
+                <input type="number" step="0.005" data-cm-field="handlingTime" value="0.01">
+                <p>Warehouse to table setup time.</p>
+              </div>
+
+              <div class="param-box">
+                <label>Startup Time (hr/job) <span class="excel-ref-pill" data-ref-key="startupTime">?</span></label>
+                <input type="number" step="0.005" data-cm-field="startupTime" value="0.01">
+                <p>Fabrication setup time.</p>
+              </div>
+
+              <div class="param-box">
+                <label>Cutting Time Multiplier <span class="excel-ref-pill" data-ref-key="cuttingTime">?</span></label>
+                <input type="number" step="1" data-cm-field="cuttingTime" value="60">
+                <p>Cutting cycle units.</p>
+              </div>
+
+              <div class="param-box">
+                <label>Machine Cutting Rate ($/unit) <span class="excel-ref-pill" data-ref-key="laborMachineCost">?</span></label>
+                <input type="number" step="0.005" data-cm-field="laborMachineCost" value="0.01">
+                <p>Rate per cutting unit.</p>
+              </div>
+
+              <div class="param-box">
+                <label>Packing Labor Time (hr/job) <span class="excel-ref-pill" data-ref-key="packingTime">?</span></label>
+                <input type="number" step="0.01" data-cm-field="packingTime" value="0.05">
+                <p>Roll packing labor.</p>
+              </div>
+
+              <div class="param-box">
+                <label>General Margin (% decimal) <span class="excel-ref-pill" data-ref-key="marginGeneral">?</span></label>
+                <input type="number" step="0.05" data-cm-field="marginGeneral" value="0.40">
+                <p>40% cumulative margin.</p>
+              </div>
+
+              <div class="param-box">
+                <label>Packing Material Margin (% decimal) <span class="excel-ref-pill" data-ref-key="marginPacking">?</span></label>
+                <input type="number" step="0.01" data-cm-field="marginPacking" value="0.05">
+                <p>5% margin on packaging material.</p>
+              </div>
+
+              <div class="param-box" style="grid-column: span 2;">
+                <label>Other Packing Allowance ($/job) <span class="excel-ref-pill" data-ref-key="otherPackingAllowance">?</span></label>
+                <input type="number" step="0.25" data-cm-field="otherPackingAllowance" value="1.00">
+                <p>Allowance for protective wraps and carton freight.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             VIEW 3: BOX RULES & SURCHARGES
+             ================================================================ -->
+        <div class="page-view" id="view-parameters">
+          <div class="card">
+            <div class="card-title-row">
+              <div class="card-title">Standard Box Selection Matrix</div>
+              <button class="btn btn-sm btn-secondary btn-reset-box-rules">Reset Rules</button>
+            </div>
+            <table class="clean-table" style="margin-bottom:1.5rem;">
+              <thead>
+                <tr>
+                  <th>Tier</th>
+                  <th>Max Roll (in)</th>
+                  <th>Box Dimensions</th>
+                  <th>Box Cost ($)</th>
+                </tr>
+              </thead>
+              <tbody id="box-rules-tbody"></tbody>
+            </table>
+
+            <div class="card-title-row" style="margin-top:1.5rem;">
+              <div class="card-title">Fixed Post-Margin Surcharges</div>
+            </div>
+            <div class="form-two-col">
+              <div class="param-box">
+                <label>Round Angles Surcharge <span class="excel-ref-pill" data-ref-key="roundAnglesSur">?</span></label>
+                <input type="number" step="0.5" data-sc-field="roundAngles" value="2.50">
+              </div>
+              <div class="param-box">
+                <label>Bevel Edges Surcharge <span class="excel-ref-pill" data-ref-key="bevelEdgesSur">?</span></label>
+                <input type="number" step="0.5" data-sc-field="bevelEdges" value="4.00">
+              </div>
+              <div class="param-box">
+                <label>Non-Square Shape Surcharge <span class="excel-ref-pill" data-ref-key="nonSquareSur">?</span></label>
+                <input type="number" step="0.5" data-sc-field="nonSquareShape" value="2.50">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             VIEW 4: SAVED CUSTOMER QUOTES
+             ================================================================ -->
+        <div class="page-view" id="view-quotes-history">
+          <div class="card">
+            <div class="card-title-row">
+              <div class="card-title">Saved Customer Quotes</div>
+              <div style="display:flex;gap:0.5rem;">
+                <button class="btn btn-sm btn-secondary" id="btn-export-csv">Export CSV</button>
+                <button class="btn btn-sm btn-secondary" id="btn-clear-history">Clear</button>
+              </div>
+            </div>
+            <table class="clean-table">
+              <thead>
+                <tr>
+                  <th>Quote ID</th>
+                  <th>Customer Code</th>
+                  <th>Customer Name</th>
+                  <th>Details</th>
+                  <th>Qty</th>
+                  <th>Total ($)</th>
+                  <th>Date</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="quotes-history-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             VIEW 5: PRINTABLE QUOTATION
+             ================================================================ -->
+        <div class="page-view" id="view-quote-preview">
+          <div style="max-width:760px;margin:0 auto 1rem;display:flex;justify-content:space-between;" class="no-print">
+            <button class="btn btn-secondary" onclick="window.historyNavTo('dashboard')">← Return to Dashboard</button>
+            <button class="btn btn-primary" onclick="window.print()">Print Quotation</button>
+          </div>
+
+          <div class="card" style="max-width:760px;margin:0 auto;padding:2rem;" id="printable-quote-sheet">
+            <div style="display:flex;justify-content:space-between;border-bottom:2px solid var(--border-color);padding-bottom:1rem;margin-bottom:1rem;">
+              <div>
+                <h2 style="font-size:1.3rem;font-weight:800;">PVC SURFACE PROTECTION LLC</h2>
+                <p style="font-size:0.8rem;color:var(--text-muted);">Precision Custom Table Covers & Digital Cutting</p>
+              </div>
+              <div style="text-align:right;" id="pq-meta-info">
+                <div style="font-size:1.1rem;font-weight:700;color:var(--color-primary);">QT-2026-0101</div>
+                <div style="font-size:0.8rem;color:var(--text-muted);">Date: 2026-11-07</div>
+              </div>
+            </div>
+
+            <div id="pq-customer-info" style="background:var(--bg-subtle);padding:0.85rem;border-radius:var(--radius-md);margin-bottom:1.25rem;"></div>
+
+            <table class="clean-table" style="margin-bottom:1.25rem;">
+              <thead>
+                <tr>
+                  <th>Item & Specifications</th>
+                  <th style="text-align:right;">Area</th>
+                  <th style="text-align:right;">Qty</th>
+                  <th style="text-align:right;">Unit Price</th>
+                  <th style="text-align:right;">Total</th>
+                </tr>
+              </thead>
+              <tbody id="pq-items-tbody"></tbody>
+            </table>
+
+            <div style="display:flex;justify-content:flex-end;">
+              <div style="width:240px;background:var(--bg-subtle);padding:0.85rem;border-radius:var(--radius-md);">
+                <div style="display:flex;justify-content:space-between;margin-bottom:0.25rem;font-size:0.85rem;">
+                  <span>Subtotal:</span>
+                  <strong id="pq-subtotal">$39.40</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border-color);padding-top:0.4rem;font-size:1rem;font-weight:800;color:var(--color-primary);">
+                  <span>Grand Total:</span>
+                  <span id="pq-grand-total">$39.40</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- ======================================================================
+       CONTAINER 2: AUTHENTIC EXCEL SPREADSHEET VIEW
+       ====================================================================== -->
+  <div id="excel-replica-wrapper">
+    <!-- Excel Ribbon Top Bar -->
+    <div class="excel-top-ribbon">
+      <div class="excel-brand">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M21.17 3H2.83A1.83 1.83 0 001 4.83v14.34A1.83 1.83 0 002.83 21h18.34A1.83 1.83 0 0023 19.17V4.83A1.83 1.83 0 0021.17 3zm-9.74 13.91h-2.1l-2-3.6-2 3.6h-2.1l3.05-4.83L3.3 7.25h2.1l1.93 3.5 1.93-3.5h2.1l-2.98 4.83 3.05 4.83z"/>
+        </svg>
+        <span>260929 Table Cover Surface Protection Calculator ver 2.xlsx</span>
+      </div>
+      <div style="display:flex;gap:0.75rem;align-items:center;">
+        <span class="excel-sheet-sync-pill">● Real-time Two-Way Sync Active</span>
+        <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('btn-switch-web-mode').click();" style="color:#000;">
+          Switch to Web App View
+        </button>
+      </div>
+    </div>
+
+    <!-- Excel Formula Bar -->
+    <div class="excel-formula-bar-container">
+      <div class="excel-name-box" id="xl-name-box">C5</div>
+      <div class="excel-fx-icon">fx</div>
+      <input type="text" class="excel-formula-input" id="xl-formula-bar" value="2" readonly>
+    </div>
+
+    <!-- Excel Top Worksheet Tabs Strip (Prominent & Unmissable) -->
+    <div class="excel-top-tabs-bar">
+      <div class="excel-tabs-header-label">📑 WORKBOOK SHEETS:</div>
+      <div class="excel-top-tab-list">
+        <button type="button" class="excel-tab-btn active" data-sheet="Customer Quote">
+          <span class="sheet-tab-icon">📄</span>
+          <span>Customer Quote</span>
+          <span class="sheet-tab-badge">Main Quote</span>
+        </button>
+        <button type="button" class="excel-tab-btn" data-sheet="Cutting Cost Model">
+          <span class="sheet-tab-icon">📊</span>
+          <span>Cutting Cost Model</span>
+          <span class="sheet-tab-badge">52 Rows</span>
+        </button>
+        <button type="button" class="excel-tab-btn" data-sheet="Parameters">
+          <span class="sheet-tab-icon">📦</span>
+          <span>Parameters</span>
+          <span class="sheet-tab-badge">Box Matrix</span>
+        </button>
+        <button type="button" class="excel-tab-btn" data-sheet="ALL" style="font-weight:700;">
+          <span class="sheet-tab-icon">📑</span>
+          <span>View All 3 Sheets Together</span>
+          <span class="sheet-tab-badge" style="background:#107c41;color:white;">Full Book</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Active Sheet Grid Viewport -->
+    <div class="excel-sheet-viewport" id="xl-viewport">
+      <!-- Sheet tables injected dynamically -->
+      <table class="excel-grid-table" id="xl-grid-table"></table>
+    </div>
+
+    <!-- Bottom Sheet Tabs Bar (Synced with Top Tabs) -->
+    <div class="excel-bottom-tabs-bar">
+      <div class="excel-tab-list">
+        <button type="button" class="excel-tab-btn active" data-sheet="Customer Quote">
+          <span>Customer Quote</span>
+        </button>
+        <button type="button" class="excel-tab-btn" data-sheet="Cutting Cost Model">
+          <span>Cutting Cost Model</span>
+        </button>
+        <button type="button" class="excel-tab-btn" data-sheet="Parameters">
+          <span>Parameters</span>
+        </button>
+        <button type="button" class="excel-tab-btn" data-sheet="ALL" style="font-weight:700;">
+          <span>📑 View All 3 Sheets</span>
+        </button>
+      </div>
+      <div class="excel-status-info">
+        <span>Ready</span>
+        <span>🟡 Yellow: <strong>Editable Inputs</strong></span>
+        <span>🔵 Blue: <strong>Formulas</strong></span>
+        <span>🟢 Green: <strong>Summary Prices</strong></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       MODAL: EDIT CUTTING COST MODEL (INFREQUENT ASSUMPTIONS)
+       ====================================================================== -->
+  <div class="modal-backdrop" id="cost-model-modal">
+    <div class="modal-sheet">
+      <div class="modal-top">
+        <h2>Cutting Cost Assumptions (Infrequent Values)</h2>
+        <button class="modal-close modal-close-btn" title="Close">✕</button>
+      </div>
+
+      <div class="modal-scrollable">
+        <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:1rem;">
+          Update raw PVC resin costs, ocean freight, tariffs, cutting rates, and profit margins.
+        </p>
+        <div class="form-two-col">
+          <div class="param-box">
+            <label>Raw PVC Cost ($/kg) <span class="excel-ref-pill" data-ref-key="rawPvcCost">?</span></label>
+            <input type="number" step="0.05" data-cm-field="rawPvcCost" value="2.10">
+          </div>
+          <div class="param-box">
+            <label>PVC Density Factor (kg/sqm/mm) <span class="excel-ref-pill" data-ref-key="densityFactor">?</span></label>
+            <input type="number" step="0.01" data-cm-field="densityFactor" value="1.22">
+          </div>
+          <div class="param-box">
+            <label>SQM / Container <span class="excel-ref-pill" data-ref-key="sqmPerContainer">?</span></label>
+            <input type="number" step="100" data-cm-field="sqmPerContainer" value="7000">
+          </div>
+          <div class="param-box">
+            <label>Transportation Cost ($/container) <span class="excel-ref-pill" data-ref-key="transportCost">?</span></label>
+            <input type="number" step="100" data-cm-field="transportCost" value="9500">
+          </div>
+          <div class="param-box">
+            <label>Import Tariff (% decimal) <span class="excel-ref-pill" data-ref-key="tariff">?</span></label>
+            <input type="number" step="0.01" data-cm-field="tariff" value="0.17">
+          </div>
+          <div class="param-box">
+            <label>Scrap / Waste Factor (% decimal) <span class="excel-ref-pill" data-ref-key="waste">?</span></label>
+            <input type="number" step="0.01" data-cm-field="waste" value="0.20">
+          </div>
+          <div class="param-box">
+            <label>Hourly Labor Rate ($/hour) <span class="excel-ref-pill" data-ref-key="laborCost">?</span></label>
+            <input type="number" step="1" data-cm-field="laborCost" value="30.00">
+          </div>
+          <div class="param-box">
+            <label>Cutting Time Multiplier <span class="excel-ref-pill" data-ref-key="cuttingTime">?</span></label>
+            <input type="number" step="1" data-cm-field="cuttingTime" value="60">
+          </div>
+          <div class="param-box">
+            <label>Machine Cutting Rate ($/unit) <span class="excel-ref-pill" data-ref-key="laborMachineCost">?</span></label>
+            <input type="number" step="0.005" data-cm-field="laborMachineCost" value="0.01">
+          </div>
+          <div class="param-box">
+            <label>General Margin (% decimal) <span class="excel-ref-pill" data-ref-key="marginGeneral">?</span></label>
+            <input type="number" step="0.05" data-cm-field="marginGeneral" value="0.40">
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-bottom">
+        <button class="btn btn-secondary btn-reset-cost-model">Reset Defaults</button>
+        <button class="btn btn-primary modal-close-btn">Done & Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       MODAL: PACKAGING BOX RULES
+       ====================================================================== -->
+  <div class="modal-backdrop" id="box-rules-modal">
+    <div class="modal-sheet" style="max-width:550px;">
+      <div class="modal-top">
+        <h2>Packaging Box Rules</h2>
+        <button class="modal-close modal-close-btn" title="Close">✕</button>
+      </div>
+      <div class="modal-scrollable">
+        <table class="clean-table">
+          <thead>
+            <tr>
+              <th>Max Roll (in)</th>
+              <th>Standard Box Size</th>
+              <th>Cost ($)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>≤ 29"</td>
+              <td>30" x 6" x 6"</td>
+              <td>$1.90</td>
+            </tr>
+            <tr>
+              <td>≤ 41"</td>
+              <td>42" x 6" x 6"</td>
+              <td>$2.58</td>
+            </tr>
+            <tr>
+              <td>≤ 47"</td>
+              <td>48" x 6" x 6"</td>
+              <td>$2.41</td>
+            </tr>
+            <tr>
+              <td>≤ 59"</td>
+              <td>60" x 6" x 6"</td>
+              <td>$3.77</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="modal-bottom">
+        <button class="btn btn-secondary btn-reset-box-rules">Reset Rules</button>
+        <button class="btn btn-primary modal-close-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       MODAL: SPREADSHEET LOCATION POPUP ('?' CLICK)
+       ====================================================================== -->
+  <div class="excel-ref-modal" id="excel-ref-modal">
+    <div class="excel-ref-card">
+      <div class="excel-ref-header">
+        <span style="font-weight:700;font-size:0.95rem;">Spreadsheet Cell Reference</span>
+        <button type="button" class="modal-close" style="color:white;" onclick="closeExcelRefModal()">✕</button>
+      </div>
+      <div class="excel-ref-body">
+        <div class="ref-meta-row">
+          <div class="ref-badge">Sheet: <strong id="ref-modal-sheet">Customer Quote</strong></div>
+          <div class="ref-badge">Cell: <strong id="ref-modal-coord">C5</strong></div>
+          <div class="ref-badge">Type: <strong id="ref-modal-type">Input Cell</strong></div>
+        </div>
+        <div style="font-size:0.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.25rem;">Excel Formula / Expression:</div>
+        <div class="ref-formula-box" id="ref-modal-formula">='Customer Quote'!$C$5</div>
+        <div class="ref-desc-text" id="ref-modal-desc">
+          Select nominal sheet thickness in mm. Highlighted yellow in the original spreadsheet.
+        </div>
+      </div>
+      <div class="excel-ref-footer">
+        <span style="font-size:0.75rem;color:var(--text-muted);">Current Value: <strong id="ref-modal-val" style="color:var(--color-primary);">$39.40</strong></span>
+        <button type="button" class="btn btn-sm btn-primary" id="btn-jump-to-excel-cell">
+          🔎 Jump to Cell in Excel Grid
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Box -->
+  <div class="toast-box" id="toast-container"></div>
+
+  <!-- ======================================================================
+       JAVASCRIPT APPLICATION ENGINE (CALCULATOR, EXCEL MAPPINGS, EXCEL GRID)
+       ====================================================================== -->
+  <script>
+    "use strict";
+
+    // 1. DEFAULT CONFIGURATION
+    const DEFAULT_CONFIG = {
+      quote: {
+        customerCode: "CUST-1001",
+        customerName: "Acme Surfaces & Design",
+        quoteId: "QT-2026-0101",
+        date: new Date().toISOString().split("T")[0],
+        thickness: 2,
+        width: 38,
+        length: 92,
+        shape: "Square/Rectangle",
+        roundAngles: "No",
+        bevelEdges: "Yes",
+        quantity: 1
+      },
+      costModel: {
+        rawPvcCost: 2.10,
+        densityFactor: 1.22,
+        sqmPerContainer: 7000,
+        transportCost: 9500,
+        tariff: 0.17,
+        waste: 0.20,
+        handlingTime: 0.01,
+        laborCost: 30.00,
+        startupTime: 0.01,
+        cuttingTime: 60,
+        laborMachineCost: 0.01,
+        packingTime: 0.05,
+        marginGeneral: 0.40,
+        marginPacking: 0.05,
+        otherPackingAllowance: 1.00
+      },
+      parameters: {
+        sqInchToSqm: 0.00064516,
+        surcharges: {
+          roundAngles: 2.50,
+          bevelEdges: 4.00,
+          nonSquareShape: 2.50
+        },
+        boxRules: [
+          { id: 1, maxRoll: 29, name: '30" x 6" x 6"', cost: 1.90 },
+          { id: 2, maxRoll: 41, name: '42" x 6" x 6"', cost: 2.58 },
+          { id: 3, maxRoll: 47, name: '48" x 6" x 6"', cost: 2.41 },
+          { id: 4, maxRoll: 59, name: '60" x 6" x 6"', cost: 3.77 }
+        ]
+      },
+      sampleCustomers: [
+        { code: "CUST-1001", name: "Acme Surfaces & Design" },
+        { code: "CUST-1002", name: "Pacific Glass & Tableware" },
+        { code: "CUST-1003", name: "Metro Commercial Furnishings" },
+        { code: "CUST-1004", name: "Apex Hotel & Banquet Supply" }
+      ]
+    };
+
+    // 2. EXCEL LOCATION KNOWLEDGE MAP (Exact cells, formulas & descriptions)
+    const EXCEL_REF_MAP = {
+      thickness: {
+        sheet: "Customer Quote",
+        coord: "C5",
+        altSheet: "Cutting Cost Model",
+        altCoord: "C5",
+        type: "Input (Yellow Cell)",
+        formula: "='Customer Quote'!$C$5 (Validation: 2, 3, 4, 5, 6, 7)",
+        desc: "Select nominal sheet thickness in millimeters. Feeds raw material and weight calculations."
+      },
+      width: {
+        sheet: "Customer Quote",
+        coord: "C6",
+        altSheet: "Cutting Cost Model",
+        altCoord: "C6",
+        type: "Input (Yellow Cell)",
+        formula: "='Customer Quote'!$C$6",
+        desc: "Finished cover width in inches. Along with length, defines the bounding rectangle for PVC usage."
+      },
+      length: {
+        sheet: "Customer Quote",
+        coord: "C7",
+        altSheet: "Cutting Cost Model",
+        altCoord: "C7",
+        type: "Input (Yellow Cell)",
+        formula: "='Customer Quote'!$C$7",
+        desc: "Finished cover length in inches. Feeds square meter calculation and roll length."
+      },
+      shape: {
+        sheet: "Customer Quote",
+        coord: "C8",
+        altSheet: "Cutting Cost Model",
+        altCoord: "C8",
+        type: "Input (Yellow Cell)",
+        formula: "='Customer Quote'!$C$8 (Square/Rectangle, Round, Oval, Ellipse)",
+        desc: "Selected shape. Shapes other than Square/Rectangle incur a $2.50 fixed surcharge."
+      },
+      dimCheck: {
+        sheet: "Cutting Cost Model",
+        coord: "C10",
+        altSheet: "Customer Quote",
+        altCoord: "C10",
+        type: "Calculation (Blue Cell)",
+        formula: '=IF(AND($C$8="Round",ISNUMBER($C$6),ISNUMBER($C$7),$C$6<>$C$7),"ERROR: Round requires Width = Length",IF(OR(NOT(ISNUMBER($C$6)),NOT(ISNUMBER($C$7))),"Enter Width and Length in inches","OK"))',
+        desc: "Calculation is blocked when a Round shape has unequal Width and Length."
+      },
+      roundAngles: {
+        sheet: "Customer Quote",
+        coord: "C11",
+        altSheet: "Cutting Cost Model",
+        altCoord: "C11",
+        type: "Input (Yellow Cell)",
+        formula: "='Customer Quote'!$C$11 (Yes / No)",
+        desc: "If Yes, adds $2.50 to Selling Price after margins (Parameters!B2)."
+      },
+      bevelEdges: {
+        sheet: "Customer Quote",
+        coord: "C12",
+        altSheet: "Cutting Cost Model",
+        altCoord: "C12",
+        type: "Input (Yellow Cell)",
+        formula: "='Customer Quote'!$C$12 (Yes / No)",
+        desc: "If Yes, adds $4.00 to Selling Price after margins (Parameters!B3)."
+      },
+      sqmUsed: {
+        sheet: "Cutting Cost Model",
+        coord: "C9",
+        altSheet: "Customer Quote",
+        altCoord: "C9",
+        type: "Calculation (Blue Cell)",
+        formula: '=IF(OR(NOT(ISNUMBER($C$6)),NOT(ISNUMBER($C$7)),AND($C$8="Round",$C$6<>$C$7)),0,$C$6*$C$7*Parameters!$B$6)',
+        desc: "Bounding rectangle: Width × Length × 0.00064516 (sq in to sqm conversion), regardless of shape."
+      },
+      rollLength: {
+        sheet: "Cutting Cost Model",
+        coord: "C13",
+        altSheet: "Customer Quote",
+        altCoord: "C13",
+        type: "Calculation (Blue Cell)",
+        formula: '=IF(OR(NOT(ISNUMBER($C$6)),NOT(ISNUMBER($C$7)),AND($C$8="Round",$C$6<>$C$7)),0,IF($C$8="Round",$C$6,MIN($C$6,$C$7)))',
+        desc: "Rectangle/Oval/Ellipse: shorter finished dimension. Round: diameter. Drives carton size."
+      },
+      selectedBox: {
+        sheet: "Cutting Cost Model",
+        coord: "C26",
+        altSheet: "Cutting Cost Model",
+        altCoord: "C27",
+        type: "Calculation (Blue Cell)",
+        formula: '=IF($C$13<=0,"",IF($C$13<=Parameters!$C$2,Parameters!$D$2,IF($C$13<=Parameters!$C$3,Parameters!$D$3,IF($C$13<=Parameters!$C$4,Parameters!$D$4,IF($C$13<=Parameters!$C$5,Parameters!$D$5,"NO STANDARD BOX")))))',
+        desc: "AUTOMATIC: carton selected from editable roll-length thresholds on the Parameters sheet."
+      },
+      preMarginCost: {
+        sheet: "Cutting Cost Model",
+        coord: "C46",
+        altSheet: "Cutting Cost Model",
+        altCoord: "G8",
+        type: "Calculation (Green Summary)",
+        formula: "=SUM($C$37:$C$42)",
+        desc: "All production costs before margins: Raw Material + Handling + Startup + Cutting + Packing Labor + Carton."
+      },
+      rawMaterialJob: {
+        sheet: "Cutting Cost Model",
+        coord: "C37",
+        altSheet: "Cutting Cost Model",
+        altCoord: "G7",
+        type: "Calculation (Green Summary)",
+        formula: "=$C$36*$C$9",
+        desc: "Total landed raw material cost per sqm (incl. waste) × SQM of PVC used."
+      },
+      totalLabor: {
+        sheet: "Cutting Cost Model",
+        coord: "C38",
+        altSheet: "Cutting Cost Model",
+        altCoord: "C39 / C41",
+        type: "Calculation (Rows 38, 39, 41)",
+        formula: "Handling ($C$21*$C$22) + Startup ($C$23*$C$22) + Packing Labor ($C$28*$C$22)",
+        desc: "Labor rate ($30/hr) multiplied by handling time, startup time, and roll packing time."
+      },
+      cuttingCost: {
+        sheet: "Cutting Cost Model",
+        coord: "C40",
+        type: "Calculation",
+        formula: "=$C$24*$C$25",
+        desc: "Cutting time units (60) × machine/labor rate ($0.01) = $0.60 per job."
+      },
+      packingMatCost: {
+        sheet: "Cutting Cost Model",
+        coord: "C42",
+        type: "Calculation",
+        formula: "=$C$27+$C$31",
+        desc: "Selected carton cost ($2.58) + editable other packing allowance ($1.00) = $3.58."
+      },
+      genMarginAmt: {
+        sheet: "Cutting Cost Model",
+        coord: "C44",
+        altSheet: "Cutting Cost Model",
+        altCoord: "G9",
+        type: "Calculation (Green Summary)",
+        formula: "=$C$43*$C$29",
+        desc: "Cost base subject to margin ($22.60) × cumulative general margin (40%) = $9.04."
+      },
+      packMarginAmt: {
+        sheet: "Cutting Cost Model",
+        coord: "C45",
+        altSheet: "Cutting Cost Model",
+        altCoord: "G10",
+        type: "Calculation",
+        formula: "=$C$42*$C$30",
+        desc: "Total packing material cost ($3.58) × packing material margin (5%) = $0.18."
+      },
+      totalSurcharges: {
+        sheet: "Cutting Cost Model",
+        coord: "C50",
+        altSheet: "Cutting Cost Model",
+        altCoord: "G11",
+        type: "Calculation (Blue Cell)",
+        formula: "=SUM($C$47:$C$49)",
+        desc: "Sum of fixed surcharges (Round Angles + Bevel Edges + Shape) added directly after margins."
+      },
+      sellingPrice: {
+        sheet: "Customer Quote",
+        coord: "G12",
+        altSheet: "Cutting Cost Model",
+        altCoord: "C51",
+        type: "Final Output (Green Bold)",
+        formula: "=$C$43*(1+$C$29)+$C$42*(1+$C$30)+$C$50",
+        desc: "General-margin costs + packing material with its own markup + fixed surcharges = $39.40."
+      },
+      sellingPriceSqm: {
+        sheet: "Cutting Cost Model",
+        coord: "C52",
+        altSheet: "Cutting Cost Model",
+        altCoord: "G13",
+        type: "Calculation",
+        formula: "=IF($C$9>0,$C$51/$C$9,0)",
+        desc: "Selling price divided by SQM of PVC used = $17.47 / sqm."
+      },
+      rawPvcCost: { sheet: "Cutting Cost Model", coord: "C15", type: "Input", formula: "2.1", desc: "Raw PVC cost in $/kg (user starting assumption)." },
+      densityFactor: { sheet: "Cutting Cost Model", coord: "C16", type: "Input", formula: "1.22", desc: "PVC density factor in kg/sqm/mm." },
+      sqmPerContainer: { sheet: "Cutting Cost Model", coord: "C17", type: "Input", formula: "7000", desc: "SQM / container used to allocate ocean freight." },
+      transportCost: { sheet: "Cutting Cost Model", coord: "C18", type: "Input", formula: "9500", desc: "Ocean freight in $/container." },
+      tariff: { sheet: "Cutting Cost Model", coord: "C19", type: "Input", formula: "0.17", desc: "17% tariff applied to Ex Works raw material cost." },
+      waste: { sheet: "Cutting Cost Model", coord: "C20", type: "Input", formula: "0.20", desc: "20% scrap allowance applied to landed raw material." },
+      laborCost: { sheet: "Cutting Cost Model", coord: "C22", type: "Input", formula: "30.00", desc: "Standard labor cost in $/hour." },
+      handlingTime: { sheet: "Cutting Cost Model", coord: "C21", type: "Input", formula: "0.01", desc: "Handling time in hour/job." },
+      startupTime: { sheet: "Cutting Cost Model", coord: "C23", type: "Input", formula: "0.01", desc: "Startup setup time in hour/job." },
+      cuttingTime: { sheet: "Cutting Cost Model", coord: "C24", type: "Input", formula: "60", desc: "Cutting cycle time units/job." },
+      laborMachineCost: { sheet: "Cutting Cost Model", coord: "C25", type: "Input", formula: "0.01", desc: "Labor + machine cutting rate in $/unit." },
+      packingTime: { sheet: "Cutting Cost Model", coord: "C28", type: "Input", formula: "0.05", desc: "Packing labor time in hour/job." },
+      marginGeneral: { sheet: "Cutting Cost Model", coord: "C29", type: "Input", formula: "0.40", desc: "40% cumulative general margin." },
+      marginPacking: { sheet: "Cutting Cost Model", coord: "C30", type: "Input", formula: "0.05", desc: "5% packing material margin." },
+      otherPackingAllowance: { sheet: "Cutting Cost Model", coord: "C31", type: "Input", formula: "1.00", desc: "Allowance for carton inserts, wrap, and freight." },
+      transPerSqm: { sheet: "Cutting Cost Model", coord: "C33", type: "Calculation", formula: "=IF($C$17>0,$C$18/$C$17,0)", desc: "Transportation cost allocated per sqm." },
+      rawExWorks: { sheet: "Cutting Cost Model", coord: "C34", type: "Calculation", formula: "=$C$15*$C$16*$C$5", desc: "Raw PVC cost × density × thickness in mm." },
+      rawLanded: { sheet: "Cutting Cost Model", coord: "C35", type: "Calculation", formula: "=$C$34*(1+$C$19)+$C$33", desc: "Ex Works × (1 + tariff) + transport per sqm." },
+      rawTotalSqm: { sheet: "Cutting Cost Model", coord: "C36", type: "Calculation", formula: "=$C$35*(1+$C$20)", desc: "Landed raw material × (1 + waste)." },
+      roundAnglesSur: { sheet: "Parameters", coord: "B2", type: "Parameter", formula: "2.5", desc: "Fixed surcharge when Round Angles = Yes." },
+      bevelEdgesSur: { sheet: "Parameters", coord: "B3", type: "Parameter", formula: "4.0", desc: "Fixed surcharge when Bevel Edges = Yes." },
+      nonSquareSur: { sheet: "Parameters", coord: "B4", type: "Parameter", formula: "2.5", desc: "Fixed surcharge when Shape is not Square/Rectangle." },
+      customerCode: { sheet: "Customer Quote", coord: "Header", type: "Application Feature", formula: "Customer Quoting System", desc: "Customer code identifier for saving and reloading client quotes." }
+    };
+
+    // 3. PURE CALCULATION ENGINE (Faithful to Excel Workbook)
+    const Calculator = {
+      calculate(quote, costModel, parameters) {
+        const q = { ...quote };
+        const cm = { ...costModel };
+        const p = { ...parameters };
+
+        const width = parseFloat(q.width) || 0;
+        const length = parseFloat(q.length) || 0;
+        const thickness = parseFloat(q.thickness) || 0;
+        const shape = q.shape || "Square/Rectangle";
+        const roundAngles = q.roundAngles === "Yes";
+        const bevelEdges = q.bevelEdges === "Yes";
+        const quantity = Math.max(1, parseInt(q.quantity, 10) || 1);
+
+        let isValid = true;
+        let dimensionMessage = "OK";
+        let errorType = null;
+
+        if (width <= 0 || length <= 0) {
+          isValid = false;
+          dimensionMessage = "Enter Width and Length in inches";
+          errorType = "MISSING_DIMENSIONS";
+        } else if (shape === "Round" && Math.abs(width - length) > 0.0001) {
+          isValid = false;
+          dimensionMessage = "ERROR: Round requires Width = Length";
+          errorType = "ROUND_MISMATCH";
+        }
+
+        if (!isValid) {
+          return {
+            isValid: false, dimensionMessage, errorType, sqmUsed: 0, rollLength: 0,
+            selectedBox: { name: "N/A", cost: 0 },
+            costs: {
+              transCostPerSqm: 0, rawCostExWorks: 0, rawCostLanded: 0, rawCostTotalPerSqm: 0,
+              rawCostJob: 0, handlingCost: 0, startupCost: 0, cuttingCost: 0,
+              packingLaborCost: 0, packingMaterialCost: 0, costBaseGeneral: 0,
+              generalMarginAmount: 0, packingMarginAmount: 0, totalCostBeforeMargins: 0
+            },
+            surcharges: { roundAngles: 0, bevelEdges: 0, shape: 0, total: 0 },
+            sellingPriceUnit: 0, sellingPriceSqm: 0, totalOrderPrice: 0, quantity
+          };
+        }
+
+        const sqInchToSqm = p.sqInchToSqm || 0.00064516;
+        const sqmUsed = width * length * sqInchToSqm;
+        const rollLength = (shape === "Round") ? width : Math.min(width, length);
+
+        let selectedBox = { name: "NO STANDARD BOX", cost: 0.0 };
+        if (rollLength > 0 && Array.isArray(p.boxRules)) {
+          const sorted = [...p.boxRules].sort((a, b) => a.maxRoll - b.maxRoll);
+          for (const rule of sorted) {
+            if (rollLength <= rule.maxRoll) {
+              selectedBox = { name: rule.name, cost: parseFloat(rule.cost) || 0 };
+              break;
+            }
+          }
+        }
+
+        const transCostPerSqm = cm.sqmPerContainer > 0 ? (cm.transportCost / cm.sqmPerContainer) : 0;
+        const rawCostExWorks = cm.rawPvcCost * cm.densityFactor * thickness;
+        const rawCostLanded = rawCostExWorks * (1 + cm.tariff) + transCostPerSqm;
+        const rawCostTotalPerSqm = rawCostLanded * (1 + cm.waste);
+        const rawCostJob = rawCostTotalPerSqm * sqmUsed;
+
+        const handlingCost = cm.handlingTime * cm.laborCost;
+        const startupCost = cm.startupTime * cm.laborCost;
+        const cuttingCost = cm.cuttingTime * cm.laborMachineCost;
+        const packingLaborCost = cm.packingTime * cm.laborCost;
+        const packingMaterialCost = selectedBox.cost + cm.otherPackingAllowance;
+
+        const costBaseGeneral = rawCostJob + handlingCost + startupCost + cuttingCost + packingLaborCost;
+        const generalMarginAmount = costBaseGeneral * cm.marginGeneral;
+        const packingMarginAmount = packingMaterialCost * cm.marginPacking;
+        const totalCostBeforeMargins = costBaseGeneral + packingMaterialCost;
+
+        const surRound = roundAngles ? (p.surcharges.roundAngles || 2.50) : 0;
+        const surBevel = bevelEdges ? (p.surcharges.bevelEdges || 4.00) : 0;
+        const surShape = (shape !== "Square/Rectangle") ? (p.surcharges.nonSquareShape || 2.50) : 0;
+        const totalSurcharges = surRound + surBevel + surShape;
+
+        const sellingPriceUnit = costBaseGeneral * (1 + cm.marginGeneral) +
+                                 packingMaterialCost * (1 + cm.marginPacking) +
+                                 totalSurcharges;
+        const sellingPriceSqm = sqmUsed > 0 ? (sellingPriceUnit / sqmUsed) : 0;
+        const totalOrderPrice = sellingPriceUnit * quantity;
+
+        return {
+          isValid: true, dimensionMessage, errorType: null,
+          width, length, thickness, shape, roundAngles, bevelEdges, quantity,
+          sqmUsed, rollLength, selectedBox,
+          costs: {
+            transCostPerSqm, rawCostExWorks, rawCostLanded, rawCostTotalPerSqm,
+            rawCostJob, handlingCost, startupCost, cuttingCost,
+            packingLaborCost, packingMaterialCost, costBaseGeneral,
+            generalMarginAmount, packingMarginAmount, totalCostBeforeMargins
+          },
+          surcharges: { roundAngles: surRound, bevelEdges: surBevel, shape: surShape, total: totalSurcharges },
+          sellingPriceUnit, sellingPriceSqm, totalOrderPrice
+        };
+      }
+    };
+
+    // 4. APPLICATION STATE
+    const AppState = {
+      viewMode: "web", // "web" | "excel"
+      activeSheet: "Customer Quote", // "Customer Quote" | "Cutting Cost Model" | "Parameters"
+      selectedCell: { coord: "C5", sheet: "Customer Quote", formula: "='Customer Quote'!$C$5" },
+      quote: { ...DEFAULT_CONFIG.quote },
+      costModel: { ...DEFAULT_CONFIG.costModel },
+      parameters: JSON.parse(JSON.stringify(DEFAULT_CONFIG.parameters)),
+      customers: [...DEFAULT_CONFIG.sampleCustomers],
+      quotesHistory: [],
+      sidebarCollapsed: false,
+      calculationResult: null
+    };
+
+    // 5. INITIALIZATION
+    document.addEventListener("DOMContentLoaded", () => {
+      loadStorage();
+      bindGlobalEvents();
+      initCustomers();
+      recalculate();
+      renderAllWebInputs();
+      renderExcelSheetGrid();
+    });
+
+    function loadStorage() {
+      try {
+        const q = localStorage.getItem("pvc_calc_quote");
+        if (q) AppState.quote = { ...DEFAULT_CONFIG.quote, ...JSON.parse(q) };
+        const cm = localStorage.getItem("pvc_calc_cm");
+        if (cm) AppState.costModel = { ...DEFAULT_CONFIG.costModel, ...JSON.parse(cm) };
+        const pm = localStorage.getItem("pvc_calc_pm");
+        if (pm) AppState.parameters = { ...DEFAULT_CONFIG.parameters, ...JSON.parse(pm) };
+        const h = localStorage.getItem("pvc_calc_history");
+        if (h) AppState.quotesHistory = JSON.parse(h);
+      } catch (e) { console.warn(e); }
+    }
+
+    function saveStorage() {
+      try {
+        localStorage.setItem("pvc_calc_quote", JSON.stringify(AppState.quote));
+        localStorage.setItem("pvc_calc_cm", JSON.stringify(AppState.costModel));
+        localStorage.setItem("pvc_calc_pm", JSON.stringify(AppState.parameters));
+        localStorage.setItem("pvc_calc_history", JSON.stringify(AppState.quotesHistory));
+      } catch (e) { console.warn(e); }
+    }
+
+    // 6. EVENT BINDING
+    function bindGlobalEvents() {
+      // View Switcher (Web vs Excel)
+      const btnWeb = document.getElementById("btn-switch-web-mode");
+      const btnExcel = document.getElementById("btn-switch-excel-mode");
+      const webWrapper = document.getElementById("web-app-wrapper");
+      const excelWrapper = document.getElementById("excel-replica-wrapper");
+
+      btnWeb.addEventListener("click", () => {
+        AppState.viewMode = "web";
+        btnWeb.classList.add("active");
+        btnExcel.classList.remove("active");
+        webWrapper.style.display = "flex";
+        excelWrapper.classList.remove("active");
+        renderAllWebInputs();
+      });
+
+      btnExcel.addEventListener("click", () => {
+        AppState.viewMode = "excel";
+        btnExcel.classList.add("active");
+        btnWeb.classList.remove("active");
+        webWrapper.style.display = "none";
+        excelWrapper.classList.add("active");
+        renderExcelSheetGrid();
+      });
+
+      // Sidebar Toggle
+      document.getElementById("sidebar-toggle-btn").addEventListener("click", () => {
+        AppState.sidebarCollapsed = !AppState.sidebarCollapsed;
+        document.getElementById("app-sidebar").classList.toggle("collapsed", AppState.sidebarCollapsed);
+      });
+
+      // Navigation Links
+      document.querySelectorAll(".menu-link").forEach((link) => {
+        link.addEventListener("click", (e) => {
+          e.preventDefault();
+          const target = link.getAttribute("data-view");
+          navigateToView(target);
+        });
+      });
+
+      // Excel Tab Switching (Syncs both Top Tabs Bar & Bottom Tabs Bar)
+      document.querySelectorAll(".excel-tab-btn").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          const sheet = tab.getAttribute("data-sheet");
+          AppState.activeSheet = sheet;
+          document.querySelectorAll(".excel-tab-btn").forEach((t) => {
+            t.classList.toggle("active", t.getAttribute("data-sheet") === sheet);
+          });
+          renderExcelSheetGrid();
+        });
+      });
+
+      // '?' Icon Click Listeners (Delegated)
+      document.body.addEventListener("click", (e) => {
+        const pill = e.target.closest(".excel-ref-pill");
+        if (pill) {
+          const key = pill.getAttribute("data-ref-key");
+          if (key && EXCEL_REF_MAP[key]) {
+            showExcelRefModal(key);
+          }
+        }
+      });
+
+      // Jump to Cell from Reference Modal
+      document.getElementById("btn-jump-to-excel-cell").addEventListener("click", () => {
+        const sheet = document.getElementById("ref-modal-sheet").textContent;
+        const coord = document.getElementById("ref-modal-coord").textContent;
+        closeExcelRefModal();
+        // Switch to Excel View
+        btnExcel.click();
+        // Switch sheet tab if needed
+        const matchingTab = document.querySelector(`.excel-tab-btn[data-sheet="${sheet}"]`);
+        if (matchingTab) matchingTab.click();
+        // Highlight cell
+        setTimeout(() => highlightCellInExcel(coord), 100);
+      });
+
+      // Customer Code Dropdown
+      const custSelect = document.getElementById("customer-code-select");
+      const custCodeInput = document.getElementById("customer-code-input");
+      const custNameInput = document.getElementById("customer-name-input");
+
+      custSelect.addEventListener("change", (e) => {
+        const val = e.target.value;
+        const cust = AppState.customers.find((c) => c.code === val);
+        if (cust) {
+          AppState.quote.customerCode = cust.code;
+          AppState.quote.customerName = cust.name;
+          custCodeInput.value = cust.code;
+          custNameInput.value = cust.name;
+          showToast(`Customer: ${cust.code} (${cust.name})`);
+          saveStorage();
+        }
+      });
+
+      custCodeInput.addEventListener("input", (e) => {
+        AppState.quote.customerCode = e.target.value.trim();
+        const found = AppState.customers.find((c) => c.code.toLowerCase() === e.target.value.trim().toLowerCase());
+        if (found) {
+          AppState.quote.customerName = found.name;
+          custNameInput.value = found.name;
+          custSelect.value = found.code;
+        }
+        saveStorage();
+      });
+
+      custNameInput.addEventListener("input", (e) => {
+        AppState.quote.customerName = e.target.value;
+        saveStorage();
+      });
+
+      document.getElementById("btn-new-customer").addEventListener("click", () => {
+        const code = prompt("Enter new Customer Code (e.g. CUST-1005):");
+        if (!code || !code.trim()) return;
+        const trimmed = code.trim().toUpperCase();
+        const name = prompt("Enter Customer Company Name:", `Customer ${trimmed}`) || trimmed;
+        AppState.customers.push({ code: trimmed, name });
+        AppState.quote.customerCode = trimmed;
+        AppState.quote.customerName = name;
+        initCustomers();
+        custCodeInput.value = trimmed;
+        custNameInput.value = name;
+        showToast(`Created Customer: ${trimmed}`);
+        saveStorage();
+      });
+
+      // Thickness Pills
+      document.querySelectorAll(".thickness-pills .seg-pill").forEach((pill) => {
+        pill.addEventListener("click", () => {
+          document.querySelectorAll(".thickness-pills .seg-pill").forEach((p) => p.classList.remove("active"));
+          pill.classList.add("active");
+          AppState.quote.thickness = parseFloat(pill.getAttribute("data-thickness")) || 2;
+          recalculate();
+        });
+      });
+
+      // Width & Length Steppers
+      document.querySelectorAll(".step-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const targetId = btn.getAttribute("data-target");
+          const step = parseFloat(btn.getAttribute("data-step")) || 1;
+          const input = document.getElementById(targetId);
+          if (input) {
+            let val = (parseFloat(input.value) || 0) + step;
+            val = Math.max(1, val);
+            input.value = val;
+            if (targetId === "part-width-input") AppState.quote.width = val;
+            if (targetId === "part-length-input") AppState.quote.length = val;
+            recalculate();
+          }
+        });
+      });
+
+      document.getElementById("part-width-input").addEventListener("input", (e) => {
+        AppState.quote.width = parseFloat(e.target.value) || 0;
+        recalculate();
+      });
+      document.getElementById("part-length-input").addEventListener("input", (e) => {
+        AppState.quote.length = parseFloat(e.target.value) || 0;
+        recalculate();
+      });
+
+      // Shape Buttons
+      document.querySelectorAll(".shape-card").forEach((card) => {
+        card.addEventListener("click", () => {
+          document.querySelectorAll(".shape-card").forEach((c) => c.classList.remove("active"));
+          card.classList.add("active");
+          AppState.quote.shape = card.getAttribute("data-shape");
+          recalculate();
+        });
+      });
+
+      // Toggles (Round Angles & Bevel Edges)
+      document.getElementById("toggle-round-angles").addEventListener("change", (e) => {
+        AppState.quote.roundAngles = e.target.checked ? "Yes" : "No";
+        e.target.closest(".option-toggle-card").classList.toggle("active", e.target.checked);
+        recalculate();
+      });
+      document.getElementById("toggle-bevel-edges").addEventListener("change", (e) => {
+        AppState.quote.bevelEdges = e.target.checked ? "Yes" : "No";
+        e.target.closest(".option-toggle-card").classList.toggle("active", e.target.checked);
+        recalculate();
+      });
+
+      // Modals
+      const costModelModal = document.getElementById("cost-model-modal");
+      const boxRulesModal = document.getElementById("box-rules-modal");
+      document.querySelectorAll(".btn-open-cost-model").forEach((btn) => {
+        btn.addEventListener("click", () => costModelModal.classList.add("active"));
+      });
+      document.querySelectorAll(".btn-open-box-rules").forEach((btn) => {
+        btn.addEventListener("click", () => boxRulesModal.classList.add("active"));
+      });
+      document.querySelectorAll(".modal-close-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          costModelModal.classList.remove("active");
+          boxRulesModal.classList.remove("active");
+        });
+      });
+      document.querySelectorAll(".modal-backdrop").forEach((backdrop) => {
+        backdrop.addEventListener("click", (e) => {
+          if (e.target === backdrop) backdrop.classList.remove("active");
+        });
+      });
+
+      // Bind Cost Model Form Inputs
+      const cmFields = ["rawPvcCost", "densityFactor", "sqmPerContainer", "transportCost", "tariff", "waste", "laborCost", "handlingTime", "startupTime", "cuttingTime", "laborMachineCost", "packingTime", "marginGeneral", "marginPacking", "otherPackingAllowance"];
+      cmFields.forEach((field) => {
+        document.querySelectorAll(`[data-cm-field="${field}"]`).forEach((input) => {
+          input.addEventListener("input", (e) => {
+            const val = parseFloat(e.target.value) || 0;
+            AppState.costModel[field] = val;
+            document.querySelectorAll(`[data-cm-field="${field}"]`).forEach((other) => {
+              if (other !== input) other.value = val;
+            });
+            recalculate();
+          });
+        });
+      });
+
+      // Reset Cost Model
+      document.querySelectorAll(".btn-reset-cost-model").forEach((b) => {
+        b.addEventListener("click", () => {
+          AppState.costModel = { ...DEFAULT_CONFIG.costModel };
+          renderAllWebInputs();
+          recalculate();
+          showToast("Reset Cost Model to defaults");
+        });
+      });
+
+      // Save Quote
+      document.getElementById("btn-save-quote").addEventListener("click", saveQuoteToHistory);
+      document.getElementById("btn-print-quote").addEventListener("click", () => {
+        navigateToView("quote-preview");
+        setTimeout(() => window.print(), 250);
+      });
+      document.getElementById("btn-reset-defaults").addEventListener("click", () => {
+        if (confirm("Reset current inputs to factory defaults?")) {
+          AppState.quote = { ...DEFAULT_CONFIG.quote };
+          AppState.costModel = { ...DEFAULT_CONFIG.costModel };
+          AppState.parameters = JSON.parse(JSON.stringify(DEFAULT_CONFIG.parameters));
+          renderAllWebInputs();
+          recalculate();
+          showToast("Reset all to spreadsheet defaults");
+        }
+      });
+    }
+
+    // 7. CUSTOMER DROPDOWN
+    function initCustomers() {
+      const select = document.getElementById("customer-code-select");
+      select.innerHTML = '<option value="">-- Pick Customer Code --</option>';
+      AppState.customers.forEach((c) => {
+        const opt = document.createElement("option");
+        opt.value = c.code;
+        opt.textContent = `${c.code} - ${c.name}`;
+        if (c.code === AppState.quote.customerCode) opt.selected = true;
+        select.appendChild(opt);
+      });
+    }
+
+    // 8. RECALCULATION & SYNC
+    function recalculate() {
+      const res = Calculator.calculate(AppState.quote, AppState.costModel, AppState.parameters);
+      AppState.calculationResult = res;
+
+      // Update Web View Outputs
+      const kpiPrice = document.getElementById("kpi-selling-price");
+      const kpiSqmPrice = document.getElementById("kpi-price-sqm");
+      const kpiTotal = document.getElementById("kpi-total-order-price");
+      const kpiSqm = document.getElementById("kpi-sqm-used");
+      const kpiRoll = document.getElementById("kpi-roll-length");
+      const kpiBox = document.getElementById("kpi-box-name");
+      const kpiBoxCost = document.getElementById("kpi-box-cost");
+      const kpiPreMargin = document.getElementById("kpi-pre-margin-cost");
+      const kpiMarginAmt = document.getElementById("kpi-margin-amount");
+
+      if (res.isValid) {
+        kpiPrice.textContent = `$${res.sellingPriceUnit.toFixed(2)}`;
+        kpiSqmPrice.textContent = `$${res.sellingPriceSqm.toFixed(2)} / sqm`;
+        kpiTotal.textContent = `$${res.totalOrderPrice.toFixed(2)}`;
+        kpiSqm.textContent = `${res.sqmUsed.toFixed(3)} sqm`;
+        kpiRoll.textContent = `${res.rollLength.toFixed(1)} in`;
+        kpiBox.textContent = res.selectedBox.name;
+        kpiBoxCost.textContent = `$${res.selectedBox.cost.toFixed(2)}`;
+        kpiPreMargin.textContent = `$${res.costs.totalCostBeforeMargins.toFixed(2)}`;
+        kpiMarginAmt.textContent = `+$${(res.costs.generalMarginAmount + res.costs.packingMarginAmount).toFixed(2)}`;
+
+        // Breakdown Table
+        document.getElementById("bd-raw-pvc").textContent = `$${res.costs.rawCostJob.toFixed(2)}`;
+        const labor = res.costs.handlingCost + res.costs.startupCost + res.costs.packingLaborCost;
+        document.getElementById("bd-labor").textContent = `$${labor.toFixed(2)}`;
+        document.getElementById("bd-cutting").textContent = `$${res.costs.cuttingCost.toFixed(2)}`;
+        document.getElementById("bd-packing-mat").textContent = `$${res.costs.packingMaterialCost.toFixed(2)}`;
+        document.getElementById("bd-pre-margin").textContent = `$${res.costs.totalCostBeforeMargins.toFixed(2)}`;
+        document.getElementById("bd-general-margin").textContent = `+$${res.costs.generalMarginAmount.toFixed(2)}`;
+        document.getElementById("bd-packing-margin").textContent = `+$${res.costs.packingMarginAmount.toFixed(2)}`;
+        document.getElementById("bd-surcharges").textContent = `+$${res.surcharges.total.toFixed(2)}`;
+        document.getElementById("bd-final-selling-price").textContent = `$${res.sellingPriceUnit.toFixed(2)}`;
+
+        // Validation
+        const alertBox = document.getElementById("validation-alert");
+        alertBox.className = "alert-box success";
+        alertBox.innerHTML = `<span><strong>Dimension Check: OK</strong> - Geometry verified (${res.selectedBox.name}). <span class="excel-ref-pill" data-ref-key="dimCheck">?</span></span>`;
+      } else {
+        kpiPrice.textContent = "--";
+        const alertBox = document.getElementById("validation-alert");
+        alertBox.className = "alert-box warning";
+        if (res.errorType === "ROUND_MISMATCH") {
+          alertBox.innerHTML = `
+            <span><strong>Round Dimension Error:</strong> Round requires equal Width and Length.</span>
+            <button class="btn btn-sm btn-primary" onclick="AppState.quote.length=AppState.quote.width;document.getElementById('part-length-input').value=AppState.quote.width;recalculate();" style="padding:0.2rem 0.5rem;font-size:0.75rem;">Match to ${AppState.quote.width}"</button>
+          `;
+        } else {
+          alertBox.innerHTML = `<span><strong>Notice:</strong> Please enter valid dimensions.</span>`;
+        }
+      }
+
+      // Rates ribbon in Cost Model
+      const th = AppState.quote.thickness || 2;
+      const transSqm = AppState.costModel.sqmPerContainer > 0 ? (AppState.costModel.transportCost / AppState.costModel.sqmPerContainer) : 0;
+      const exWorks = AppState.costModel.rawPvcCost * AppState.costModel.densityFactor * th;
+      const landed = exWorks * (1 + AppState.costModel.tariff) + transSqm;
+      const totalSqm = landed * (1 + AppState.costModel.waste);
+
+      const elTrans = document.getElementById("cm-prev-trans");
+      const elExWorks = document.getElementById("cm-prev-exworks");
+      const elLanded = document.getElementById("cm-prev-landed");
+      const elTotalSqm = document.getElementById("cm-prev-total-sqm");
+      if (elTrans) elTrans.textContent = `$${transSqm.toFixed(3)} / sqm`;
+      if (elExWorks) elExWorks.textContent = `$${exWorks.toFixed(3)} / sqm`;
+      if (elLanded) elLanded.textContent = `$${landed.toFixed(3)} / sqm`;
+      if (elTotalSqm) elTotalSqm.textContent = `$${totalSqm.toFixed(3)} / sqm`;
+
+      // Update Excel Grid if active
+      if (AppState.viewMode === "excel") {
+        renderExcelSheetGrid();
+      }
+
+      saveStorage();
+    }
+
+    // 9. RENDER WEB INPUTS
+    function renderAllWebInputs() {
+      document.getElementById("customer-code-input").value = AppState.quote.customerCode;
+      document.getElementById("customer-name-input").value = AppState.quote.customerName;
+      document.getElementById("part-width-input").value = AppState.quote.width;
+      document.getElementById("part-length-input").value = AppState.quote.length;
+      document.getElementById("toggle-round-angles").checked = AppState.quote.roundAngles === "Yes";
+      document.getElementById("toggle-bevel-edges").checked = AppState.quote.bevelEdges === "Yes";
+
+      document.querySelectorAll(".thickness-pills .seg-pill").forEach((p) => {
+        p.classList.toggle("active", parseFloat(p.getAttribute("data-thickness")) === AppState.quote.thickness);
+      });
+      document.querySelectorAll(".shape-card").forEach((c) => {
+        c.classList.toggle("active", c.getAttribute("data-shape") === AppState.quote.shape);
+      });
+
+      for (const [k, v] of Object.entries(AppState.costModel)) {
+        document.querySelectorAll(`[data-cm-field="${k}"]`).forEach((inp) => inp.value = v);
+      }
+    }
+
+    // 10. AUTHENTIC EXCEL GRID RENDERER
+    function renderExcelSheetGrid() {
+      const viewport = document.getElementById("xl-viewport");
+      const res = AppState.calculationResult || Calculator.calculate(AppState.quote, AppState.costModel, AppState.parameters);
+      const sheet = AppState.activeSheet;
+
+      let html = "";
+
+      if (sheet === "ALL") {
+        html = `
+          <div style="padding:1rem;">
+            <!-- Sheet 1 Block: Customer Quote -->
+            <div class="excel-sheet-block">
+              <div class="excel-sheet-block-title">
+                <span>📄 Sheet 1: Customer Quote</span>
+                <span class="sheet-tab-badge" style="background:rgba(255,255,255,0.2);color:white;">Tab 1</span>
+              </div>
+              <div style="overflow-x:auto;">
+                <table class="excel-grid-table">
+                  ${generateExcelCustomerQuoteSheet(res)}
+                </table>
+              </div>
+            </div>
+
+            <!-- Sheet 2 Block: Cutting Cost Model -->
+            <div class="excel-sheet-block" style="margin-top:1.5rem;">
+              <div class="excel-sheet-block-title" style="background:#107c41;">
+                <span>📊 Sheet 2: Cutting Cost Model (52-Row Full Production & Cost Model)</span>
+                <span class="sheet-tab-badge" style="background:rgba(255,255,255,0.2);color:white;">Tab 2</span>
+              </div>
+              <div style="overflow-x:auto;">
+                <table class="excel-grid-table">
+                  ${generateExcelCuttingCostSheet(res)}
+                </table>
+              </div>
+            </div>
+
+            <!-- Sheet 3 Block: Parameters -->
+            <div class="excel-sheet-block" style="margin-top:1.5rem;">
+              <div class="excel-sheet-block-title" style="background:#2f5597;">
+                <span>📦 Sheet 3: Parameters (Packaging Box Matrix & Fixed Surcharges)</span>
+                <span class="sheet-tab-badge" style="background:rgba(255,255,255,0.2);color:white;">Tab 3</span>
+              </div>
+              <div style="overflow-x:auto;">
+                <table class="excel-grid-table">
+                  ${generateExcelParametersSheet()}
+                </table>
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (sheet === "Customer Quote") {
+        html = `<table class="excel-grid-table" id="xl-grid-table">${generateExcelCustomerQuoteSheet(res)}</table>`;
+      } else if (sheet === "Cutting Cost Model") {
+        html = `<table class="excel-grid-table" id="xl-grid-table">${generateExcelCuttingCostSheet(res)}</table>`;
+      } else if (sheet === "Parameters") {
+        html = `<table class="excel-grid-table" id="xl-grid-table">${generateExcelParametersSheet()}</table>`;
+      }
+
+      viewport.innerHTML = html;
+      bindExcelGridInteractions();
+    }
+
+    function generateExcelCustomerQuoteSheet(res) {
+      const cols = ["A", "B", "C", "D", "E", "F", "G", "H"];
+      const colWidths = [170, 70, 160, 260, 40, 120, 120, 60];
+
+      let h = "<thead><tr><th class='excel-corner-cell' style='width:44px;'></th>";
+      cols.forEach((col, idx) => {
+        h += `<th class="excel-col-hdr" style="width:${colWidths[idx]}px;">${col}</th>`;
+      });
+      h += "</tr></thead><tbody>";
+
+      // Row 1: Title
+      h += `<tr><td class="excel-row-hdr">1</td><td colspan="4" class="xl-title-navy">PVC Custom Cutting Quote</td><td></td><td></td><td></td><td></td></tr>`;
+      // Row 2: Subtitle
+      h += `<tr><td class="excel-row-hdr">2</td><td colspan="4" style="color:#595959;">Enter the requested finished dimensions and options below. The selling price updates automatically.</td><td></td><td></td><td></td><td></td></tr>`;
+      // Row 3: Blank
+      h += `<tr><td class="excel-row-hdr">3</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+      // Row 4: Section Header
+      h += `<tr><td class="excel-row-hdr">4</td><td colspan="4" class="xl-sec-hdr">CUT PART PARAMETERS</td><td></td><td></td><td></td><td></td></tr>`;
+      // Row 5: Thickness
+      h += `<tr><td class="excel-row-hdr">5</td><td>Thickness</td><td class="xl-center">mm</td><td class="xl-input-yellow xl-center xl-bold" data-xl-coord="C5" data-xl-type="input" data-xl-field="thickness" data-formula="${AppState.quote.thickness}">${AppState.quote.thickness}</td><td class="xl-desc">Select nominal sheet thickness in mm</td><td></td><td></td><td></td><td></td></tr>`;
+      // Row 6: Finished Width
+      h += `<tr><td class="excel-row-hdr">6</td><td>Finished Width</td><td class="xl-center">inch</td><td class="xl-input-yellow xl-num xl-bold" data-xl-coord="C6" data-xl-type="input" data-xl-field="width" data-formula="${AppState.quote.width}">${AppState.quote.width}</td><td class="xl-desc">Finished cover width in inches</td><td></td><td></td><td></td><td></td></tr>`;
+      // Row 7: Finished Length
+      h += `<tr><td class="excel-row-hdr">7</td><td>Finished Length</td><td class="xl-center">inch</td><td class="xl-input-yellow xl-num xl-bold" data-xl-coord="C7" data-xl-type="input" data-xl-field="length" data-formula="${AppState.quote.length}">${AppState.quote.length}</td><td class="xl-desc">Finished cover length in inches</td><td></td><td></td><td></td><td></td></tr>`;
+      // Row 8: Shape
+      h += `<tr><td class="excel-row-hdr">8</td><td>Shape</td><td></td><td class="xl-input-yellow xl-center" data-xl-coord="C8" data-xl-type="input" data-xl-field="shape" data-formula="${AppState.quote.shape}">${AppState.quote.shape}</td><td class="xl-desc">Select the required shape</td><td></td><td></td><td></td><td></td></tr>`;
+      // Row 9: SQM Used
+      h += `<tr><td class="excel-row-hdr">9</td><td>SQM of PVC used</td><td class="xl-center">sqm</td><td class="xl-calc-blue xl-num" data-xl-coord="C9" data-formula="='Cutting Cost Model'!$C$9">${res.sqmUsed.toFixed(8)}</td><td class="xl-desc">PVC area used for costing</td><td></td><td></td><td></td><td></td></tr>`;
+      // Row 10: Dimension Check
+      h += `<tr><td class="excel-row-hdr">10</td><td>Dimension check</td><td></td><td class="xl-calc-blue xl-center xl-bold" data-xl-coord="C10" data-formula="='Cutting Cost Model'!$C$10">${res.dimensionMessage}</td><td class="xl-desc">Round parts require Width = Length</td><td></td><td></td><td></td><td></td></tr>`;
+      // Row 11: Round Angles
+      h += `<tr><td class="excel-row-hdr">11</td><td>Round Angles</td><td></td><td class="xl-input-yellow xl-center" data-xl-coord="C11" data-xl-type="input" data-xl-field="roundAngles" data-formula="${AppState.quote.roundAngles}">${AppState.quote.roundAngles}</td><td class="xl-desc">Select Yes if rounded corners are required</td><td></td><td></td><td></td><td></td></tr>`;
+      // Row 12: Bevel Edges & Selling Price
+      h += `<tr><td class="excel-row-hdr">12</td><td>Bevel Edges</td><td></td><td class="xl-input-yellow xl-center" data-xl-coord="C12" data-xl-type="input" data-xl-field="bevelEdges" data-formula="${AppState.quote.bevelEdges}">${AppState.quote.bevelEdges}</td><td class="xl-desc">Select Yes if bevel edges are required</td><td class="xl-title-navy xl-bold">Selling Price</td><td class="xl-sum-green xl-num xl-bold" style="font-size:12pt;" data-xl-coord="G12" data-formula="='Cutting Cost Model'!$G$12">$${res.sellingPriceUnit.toFixed(2)}</td><td></td></tr>`;
+      // Row 13: Roll Length
+      h += `<tr><td class="excel-row-hdr">13</td><td>Roll length</td><td class="xl-center">inch</td><td class="xl-calc-blue xl-num" data-xl-coord="C13" data-formula="='Cutting Cost Model'!$C$13">${res.rollLength}</td><td class="xl-desc">Calculated roll length used for packaging</td><td></td><td></td><td></td><td></td></tr>`;
+
+      h += "</tbody>";
+      return h;
+    }
+
+    function generateExcelCuttingCostSheet(res) {
+      const cols = ["A", "B", "C", "D", "E", "F", "G", "H"];
+      const colWidths = [220, 80, 140, 260, 30, 170, 120, 60];
+
+      let h = "<thead><tr><th class='excel-corner-cell' style='width:44px;'></th>";
+      cols.forEach((col, idx) => {
+        h += `<th class="excel-col-hdr" style="width:${colWidths[idx]}px;">${col}</th>`;
+      });
+      h += "</tr></thead><tbody>";
+
+      h += `<tr><td class="excel-row-hdr">1</td><td colspan="4" class="xl-title-navy">PVC Digital Cutting Cost Model – USA</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">2</td><td colspan="4" style="color:#595959;font-size:9pt;">Editable assumptions are highlighted in yellow. Finished Width and Length are entered in inches. PVC usage is based on the bounding rectangle.</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">3</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">4</td><td colspan="4" class="xl-sec-hdr">CUT PART PARAMETERS</td><td></td><td colspan="3" class="xl-sec-hdr">JOB COST SUMMARY</td></tr>`;
+
+      h += `<tr><td class="excel-row-hdr">5</td><td>Thickness</td><td class="xl-center">mm</td><td class="xl-input-yellow xl-center" data-xl-coord="C5" data-formula="='Customer Quote'!$C$5">${AppState.quote.thickness}</td><td class="xl-desc">Select nominal sheet thickness in mm</td><td></td><td class="xl-bold">Thickness</td><td class="xl-sum-green xl-center" data-xl-coord="G5" data-formula="=$C$5">${AppState.quote.thickness}</td><td class="xl-center">mm</td></tr>`;
+      h += `<tr><td class="excel-row-hdr">6</td><td>Finished Width</td><td class="xl-center">inch</td><td class="xl-input-yellow xl-num" data-xl-coord="C6" data-formula="='Customer Quote'!$C$6">${AppState.quote.width}</td><td class="xl-desc">Finished cover width in inches</td><td></td><td class="xl-bold">SQM of PVC used</td><td class="xl-sum-green xl-num" data-xl-coord="G6" data-formula="=$C$9">${res.sqmUsed.toFixed(8)}</td><td class="xl-center">sqm</td></tr>`;
+      h += `<tr><td class="excel-row-hdr">7</td><td>Finished Length</td><td class="xl-center">inch</td><td class="xl-input-yellow xl-num" data-xl-coord="C7" data-formula="='Customer Quote'!$C$7">${AppState.quote.length}</td><td class="xl-desc">Finished cover length in inches</td><td></td><td class="xl-bold">Raw material / job</td><td class="xl-sum-green xl-num" data-xl-coord="G7" data-formula="=$C$37">$${res.costs.rawCostJob.toFixed(2)}</td><td class="xl-center">$</td></tr>`;
+      h += `<tr><td class="excel-row-hdr">8</td><td>Shape</td><td></td><td class="xl-input-yellow xl-center" data-xl-coord="C8" data-formula="='Customer Quote'!$C$8">${AppState.quote.shape}</td><td class="xl-desc">Square/Rectangle, Round, Oval, Ellipse</td><td></td><td class="xl-bold">Total cost before margins</td><td class="xl-sum-green xl-num" data-xl-coord="G8" data-formula="=$C$46">$${res.costs.totalCostBeforeMargins.toFixed(2)}</td><td class="xl-center">$</td></tr>`;
+      h += `<tr><td class="excel-row-hdr">9</td><td>SQM of PVC used</td><td class="xl-center">sqm</td><td class="xl-calc-blue xl-num" data-xl-coord="C9" data-formula="=C6*C7*Parameters!B6">${res.sqmUsed.toFixed(8)}</td><td class="xl-desc">Bounding rectangle: Width × Length</td><td></td><td class="xl-bold">General margin amount</td><td class="xl-sum-green xl-num" data-xl-coord="G9" data-formula="=$C$44">$${res.costs.generalMarginAmount.toFixed(2)}</td><td class="xl-center">$</td></tr>`;
+      h += `<tr><td class="excel-row-hdr">10</td><td>Dimension check</td><td></td><td class="xl-calc-blue xl-center" data-xl-coord="C10" data-formula="=IF(Round...)">${res.dimensionMessage}</td><td class="xl-desc">Validation check for Round shape</td><td></td><td class="xl-bold">Packing material markup</td><td class="xl-sum-green xl-num" data-xl-coord="G10" data-formula="=$C$45">$${res.costs.packingMarginAmount.toFixed(2)}</td><td class="xl-center">$</td></tr>`;
+      h += `<tr><td class="excel-row-hdr">11</td><td>Round Angles</td><td></td><td class="xl-input-yellow xl-center" data-xl-coord="C11" data-formula="='Customer Quote'!$C$11">${AppState.quote.roundAngles}</td><td class="xl-desc">+$2.50 to Selling Price after margins</td><td></td><td class="xl-bold">Fixed surcharges</td><td class="xl-calc-blue xl-num" data-xl-coord="G11" data-formula="=$C$50">$${res.surcharges.total.toFixed(2)}</td><td class="xl-center">$</td></tr>`;
+      h += `<tr><td class="excel-row-hdr">12</td><td>Bevel Edges</td><td></td><td class="xl-input-yellow xl-center" data-xl-coord="C12" data-formula="='Customer Quote'!$C$12">${AppState.quote.bevelEdges}</td><td class="xl-desc">+$4.00 to Selling Price after margins</td><td></td><td class="xl-bold" style="color:var(--excel-header-dark);">Selling price</td><td class="xl-sum-green xl-num xl-bold" style="font-size:12pt;" data-xl-coord="G12" data-formula="=$C$51">$${res.sellingPriceUnit.toFixed(2)}</td><td class="xl-center">$</td></tr>`;
+      h += `<tr><td class="excel-row-hdr">13</td><td>Roll length</td><td class="xl-center">inch</td><td class="xl-calc-blue xl-num" data-xl-coord="C13" data-formula="=MIN(C6,C7)">${res.rollLength}</td><td class="xl-desc">Shorter finished dimension</td><td></td><td class="xl-bold">Selling price / sqm</td><td class="xl-sum-green xl-num" data-xl-coord="G13" data-formula="=$C$52">$${res.sellingPriceSqm.toFixed(2)}</td><td class="xl-center">$/sqm</td></tr>`;
+
+      h += `<tr><td class="excel-row-hdr">14</td><td colspan="4" class="xl-sec-hdr">MATERIAL & PRODUCTION INPUTS</td><td></td><td colspan="3" class="xl-sec-hdr">MODEL LOGIC</td></tr>`;
+      h += `<tr><td class="excel-row-hdr">15</td><td>Raw PVC cost</td><td class="xl-center">$/kg</td><td class="xl-input-yellow xl-num" data-xl-coord="C15" data-xl-cm="rawPvcCost" data-formula="${AppState.costModel.rawPvcCost}">${AppState.costModel.rawPvcCost.toFixed(2)}</td><td class="xl-desc">User-provided starting assumption</td><td></td><td colspan="3" rowspan="11" style="font-size:8pt;color:#333;vertical-align:top;line-height:1.4;">• Raw material cost / sqm = Raw PVC cost × density factor × thickness in mm.<br>• Tariff applies to Ex Works material; transport is added per sqm.<br>• Waste (20%) increases landed raw material cost.<br>• Roll length drives automatic box selection.<br>• General Margin (40%) applies to raw material, handling, startup, cutting and packing labor.<br>• Packing material uses its own 5% margin.<br>• Fixed surcharges are added after margins.</td></tr>`;
+      h += `<tr><td class="excel-row-hdr">16</td><td>PVC density factor</td><td class="xl-center">kg/sqm/mm</td><td class="xl-input-yellow xl-num" data-xl-coord="C16" data-xl-cm="densityFactor" data-formula="${AppState.costModel.densityFactor}">${AppState.costModel.densityFactor}</td><td class="xl-desc">User density factor</td></tr>`;
+      h += `<tr><td class="excel-row-hdr">17</td><td>SQM / container</td><td class="xl-center">sqm</td><td class="xl-input-yellow xl-num" data-xl-coord="C17" data-xl-cm="sqmPerContainer" data-formula="${AppState.costModel.sqmPerContainer}">${AppState.costModel.sqmPerContainer}</td><td class="xl-desc">Used to allocate ocean freight</td></tr>`;
+      h += `<tr><td class="excel-row-hdr">18</td><td>Transportation cost</td><td class="xl-center">$/container</td><td class="xl-input-yellow xl-num" data-xl-coord="C18" data-xl-cm="transportCost" data-formula="${AppState.costModel.transportCost}">${AppState.costModel.transportCost}</td><td class="xl-desc">Freight per container</td></tr>`;
+      h += `<tr><td class="excel-row-hdr">19</td><td>Tariff</td><td class="xl-center">%</td><td class="xl-input-yellow xl-num" data-xl-coord="C19" data-xl-cm="tariff" data-formula="${AppState.costModel.tariff}">${(AppState.costModel.tariff * 100).toFixed(0)}%</td><td class="xl-desc">Applied to Ex Works material</td></tr>`;
+      h += `<tr><td class="excel-row-hdr">20</td><td>Waste</td><td class="xl-center">%</td><td class="xl-input-yellow xl-num" data-xl-coord="C20" data-xl-cm="waste" data-formula="${AppState.costModel.waste}">${(AppState.costModel.waste * 100).toFixed(0)}%</td><td class="xl-desc">Applied to landed raw material</td></tr>`;
+      h += `<tr><td class="excel-row-hdr">21</td><td>Handling time</td><td class="xl-center">hour/job</td><td class="xl-input-yellow xl-num" data-xl-coord="C21" data-xl-cm="handlingTime" data-formula="${AppState.costModel.handlingTime}">${AppState.costModel.handlingTime}</td><td class="xl-desc">Warehouse to fabrication</td></tr>`;
+      h += `<tr><td class="excel-row-hdr">22</td><td>Labor cost</td><td class="xl-center">$/hour</td><td class="xl-input-yellow xl-num" data-xl-coord="C22" data-xl-cm="laborCost" data-formula="${AppState.costModel.laborCost}">${AppState.costModel.laborCost.toFixed(2)}</td><td class="xl-desc">Hourly fabrication labor</td></tr>`;
+      h += `<tr><td class="excel-row-hdr">23</td><td>Startup time</td><td class="xl-center">hour/job</td><td class="xl-input-yellow xl-num" data-xl-coord="C23" data-xl-cm="startupTime" data-formula="${AppState.costModel.startupTime}">${AppState.costModel.startupTime}</td><td class="xl-desc">Table setup time</td></tr>`;
+      h += `<tr><td class="excel-row-hdr">24</td><td>Cutting time</td><td class="xl-center">hour/job</td><td class="xl-input-yellow xl-num" data-xl-coord="C24" data-xl-cm="cuttingTime" data-formula="${AppState.costModel.cuttingTime}">${AppState.costModel.cuttingTime}</td><td class="xl-desc">Cutting cycle units</td></tr>`;
+      h += `<tr><td class="excel-row-hdr">25</td><td>Labor + Machine cost</td><td class="xl-center">$/hour</td><td class="xl-input-yellow xl-num" data-xl-coord="C25" data-xl-cm="laborMachineCost" data-formula="${AppState.costModel.laborMachineCost}">${AppState.costModel.laborMachineCost}</td><td class="xl-desc">Cutting machine unit rate</td></tr>`;
+
+      h += `<tr><td class="excel-row-hdr">26</td><td>Selected box size</td><td></td><td class="xl-calc-blue xl-center" data-xl-coord="C26" data-formula="=IF(...)">${res.selectedBox.name}</td><td class="xl-desc">AUTOMATIC: from Roll length</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">27</td><td>Selected box cost</td><td class="xl-center">$/job</td><td class="xl-calc-blue xl-num" data-xl-coord="C27" data-formula="=IF(...)">$${res.selectedBox.cost.toFixed(2)}</td><td class="xl-desc">AUTOMATIC: from threshold</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">28</td><td>Packing time</td><td class="xl-center">hour/job</td><td class="xl-input-yellow xl-num" data-xl-coord="C28" data-xl-cm="packingTime" data-formula="${AppState.costModel.packingTime}">${AppState.costModel.packingTime}</td><td class="xl-desc">Packing labor subject to margin</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">29</td><td>Margin (cumulative)</td><td class="xl-center">%</td><td class="xl-input-yellow xl-num" data-xl-coord="C29" data-xl-cm="marginGeneral" data-formula="${AppState.costModel.marginGeneral}">${(AppState.costModel.marginGeneral * 100).toFixed(0)}%</td><td class="xl-desc">Applied to all costs except carton</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">30</td><td>Packing material margin</td><td class="xl-center">%</td><td class="xl-input-yellow xl-num" data-xl-coord="C30" data-xl-cm="marginPacking" data-formula="${AppState.costModel.marginPacking}">${(AppState.costModel.marginPacking * 100).toFixed(0)}%</td><td class="xl-desc">Carton markup</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">31</td><td>Other packing material allowance</td><td class="xl-center">$/job</td><td class="xl-input-yellow xl-num" data-xl-coord="C31" data-xl-cm="otherPackingAllowance" data-formula="${AppState.costModel.otherPackingAllowance}">$${AppState.costModel.otherPackingAllowance.toFixed(2)}</td><td class="xl-desc">Editable wrap & inbound freight</td><td></td><td></td><td></td><td></td></tr>`;
+
+      h += `<tr><td class="excel-row-hdr">32</td><td colspan="4" class="xl-sec-hdr">CALCULATED COSTS</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">33</td><td>Transportation cost / sqm</td><td class="xl-center">$/sqm</td><td class="xl-calc-blue xl-num" data-xl-coord="C33" data-formula="=C18/C17">$${res.costs.transCostPerSqm.toFixed(4)}</td><td class="xl-desc">Freight ÷ Container SQM</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">34</td><td>Raw material cost / sqm – Ex Works</td><td class="xl-center">$/sqm</td><td class="xl-calc-blue xl-num" data-xl-coord="C34" data-formula="=C15*C16*C5">$${res.costs.rawCostExWorks.toFixed(3)}</td><td class="xl-desc">Raw PVC × Density × Thickness</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">35</td><td>Raw material cost / sqm incl. tariff</td><td class="xl-center">$/sqm</td><td class="xl-calc-blue xl-num" data-xl-coord="C35" data-formula="=C34*(1+C19)+C33">$${res.costs.rawCostLanded.toFixed(3)}</td><td class="xl-desc">Ex Works × (1 + tariff) + transport</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">36</td><td>Total raw material cost / sqm incl. waste</td><td class="xl-center">$/sqm</td><td class="xl-calc-blue xl-num" data-xl-coord="C36" data-formula="=C35*(1+C20)">$${res.costs.rawCostTotalPerSqm.toFixed(3)}</td><td class="xl-desc">Landed × (1 + waste)</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">37</td><td>Raw material cost / job</td><td class="xl-center">$/job</td><td class="xl-calc-blue xl-num xl-bold" data-xl-coord="C37" data-formula="=C36*C9">$${res.costs.rawCostJob.toFixed(2)}</td><td class="xl-desc">Total raw / sqm × SQM of PVC used</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">38</td><td>Handling cost</td><td class="xl-center">$/job</td><td class="xl-calc-blue xl-num" data-xl-coord="C38" data-formula="=C21*C22">$${res.costs.handlingCost.toFixed(2)}</td><td class="xl-desc">Handling time × labor cost</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">39</td><td>Startup cost</td><td class="xl-center">$/job</td><td class="xl-calc-blue xl-num" data-xl-coord="C39" data-formula="=C23*C22">$${res.costs.startupCost.toFixed(2)}</td><td class="xl-desc">Startup time × labor cost</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">40</td><td>Cutting cost</td><td class="xl-center">$/job</td><td class="xl-calc-blue xl-num" data-xl-coord="C40" data-formula="=C24*C25">$${res.costs.cuttingCost.toFixed(2)}</td><td class="xl-desc">Cutting time × unit rate</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">41</td><td>Packing labor cost</td><td class="xl-center">$/job</td><td class="xl-calc-blue xl-num" data-xl-coord="C41" data-formula="=C28*C22">$${res.costs.packingLaborCost.toFixed(2)}</td><td class="xl-desc">Packing time × labor cost</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">42</td><td>Packing material cost</td><td class="xl-center">$/job</td><td class="xl-calc-blue xl-num" data-xl-coord="C42" data-formula="=C27+C31">$${res.costs.packingMaterialCost.toFixed(2)}</td><td class="xl-desc">Box cost + other allowance</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">43</td><td>Cost base subject to general margin</td><td class="xl-center">$/job</td><td class="xl-calc-blue xl-num xl-bold" data-xl-coord="C43" data-formula="=SUM(C37:C41)">$${res.costs.costBaseGeneral.toFixed(2)}</td><td class="xl-desc">All costs except carton</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">44</td><td>General margin amount</td><td class="xl-center">$/job</td><td class="xl-calc-blue xl-num" data-xl-coord="C44" data-formula="=C43*C29">$${res.costs.generalMarginAmount.toFixed(2)}</td><td class="xl-desc">Cost base × 40% margin</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">45</td><td>Packing material margin amount</td><td class="xl-center">$/job</td><td class="xl-calc-blue xl-num" data-xl-coord="C45" data-formula="=C42*C30">$${res.costs.packingMarginAmount.toFixed(2)}</td><td class="xl-desc">Carton × 5% margin</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">46</td><td>Total cost before margins</td><td class="xl-center">$/job</td><td class="xl-calc-blue xl-num xl-bold" data-xl-coord="C46" data-formula="=SUM(C37:C42)">$${res.costs.totalCostBeforeMargins.toFixed(2)}</td><td class="xl-desc">Production costs pre-margin</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">47</td><td>Round Angles surcharge</td><td class="xl-center">$/job</td><td class="xl-calc-blue xl-num" data-xl-coord="C47" data-formula="=IF(C11='Yes',2.5,0)">$${res.surcharges.roundAngles.toFixed(2)}</td><td class="xl-desc">Added post-margin</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">48</td><td>Bevel Edges surcharge</td><td class="xl-center">$/job</td><td class="xl-calc-blue xl-num" data-xl-coord="C48" data-formula="=IF(C12='Yes',4,0)">$${res.surcharges.bevelEdges.toFixed(2)}</td><td class="xl-desc">Added post-margin</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">49</td><td>Shape surcharge</td><td class="xl-center">$/job</td><td class="xl-calc-blue xl-num" data-xl-coord="C49" data-formula="=IF(C8<>'Square/Rectangle',2.5,0)">$${res.surcharges.shape.toFixed(2)}</td><td class="xl-desc">Added post-margin</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">50</td><td>Total fixed surcharges</td><td class="xl-center">$/job</td><td class="xl-calc-blue xl-num xl-bold" data-xl-coord="C50" data-formula="=SUM(C47:C49)">$${res.surcharges.total.toFixed(2)}</td><td class="xl-desc">Sum of fixed post-margin fees</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">51</td><td>Selling price</td><td class="xl-center">$/job</td><td class="xl-calc-blue xl-num xl-bold" style="font-size:11pt;" data-xl-coord="C51" data-formula="=C43*(1+C29)+C42*(1+C30)+C50">$${res.sellingPriceUnit.toFixed(2)}</td><td class="xl-desc">Final customer unit selling price</td><td></td><td></td><td></td><td></td></tr>`;
+      h += `<tr><td class="excel-row-hdr">52</td><td>Selling price / sqm</td><td class="xl-center">$/sqm</td><td class="xl-calc-blue xl-num" data-xl-coord="C52" data-formula="=C51/C9">$${res.sellingPriceSqm.toFixed(2)}</td><td class="xl-desc">Selling price per square meter</td><td></td><td></td><td></td><td></td></tr>`;
+
+      h += "</tbody>";
+      return h;
+    }
+
+    function generateExcelParametersSheet() {
+      const cols = ["A", "B", "C", "D", "E"];
+      const colWidths = [220, 130, 150, 200, 140];
+
+      let h = "<thead><tr><th class='excel-corner-cell' style='width:44px;'></th>";
+      cols.forEach((col, idx) => {
+        h += `<th class="excel-col-hdr" style="width:${colWidths[idx]}px;">${col}</th>`;
+      });
+      h += "</tr></thead><tbody>";
+
+      h += `<tr><td class="excel-row-hdr">1</td><td class="xl-title-navy">Fixed surcharge</td><td class="xl-title-navy">Amount ($/job)</td><td class="xl-title-navy">Max roll length (in)</td><td class="xl-sec-hdr">Box size (inside dim)</td><td class="xl-sec-hdr">Box cost ($/box)</td></tr>`;
+      h += `<tr><td class="excel-row-hdr">2</td><td class="xl-input-yellow">Round Angles = Yes</td><td class="xl-input-yellow xl-num" data-xl-coord="B2" data-formula="2.5">${AppState.parameters.surcharges.roundAngles.toFixed(2)}</td><td class="xl-num">29</td><td class="xl-input-yellow xl-center">30" x 6" x 6"</td><td class="xl-input-yellow xl-num">$1.90</td></tr>`;
+      h += `<tr><td class="excel-row-hdr">3</td><td class="xl-input-yellow">Bevel Edges = Yes</td><td class="xl-input-yellow xl-num" data-xl-coord="B3" data-formula="4.0">${AppState.parameters.surcharges.bevelEdges.toFixed(2)}</td><td class="xl-num">41</td><td class="xl-input-yellow xl-center">42" x 6" x 6"</td><td class="xl-input-yellow xl-num">$2.58</td></tr>`;
+      h += `<tr><td class="excel-row-hdr">4</td><td class="xl-input-yellow">Non Square/Rectangle shape</td><td class="xl-input-yellow xl-num" data-xl-coord="B4" data-formula="2.5">${AppState.parameters.surcharges.nonSquareShape.toFixed(2)}</td><td class="xl-num">47</td><td class="xl-input-yellow xl-center">48" x 6" x 6"</td><td class="xl-input-yellow xl-num">$2.41</td></tr>`;
+      h += `<tr><td class="excel-row-hdr">5</td><td></td><td></td><td class="xl-num">59</td><td class="xl-input-yellow xl-center">60" x 6" x 6"</td><td class="xl-input-yellow xl-num">$3.77</td></tr>`;
+      h += `<tr><td class="excel-row-hdr">6</td><td>Square inch to sqm</td><td class="xl-num">0.00064516</td><td></td><td class="xl-input-yellow xl-center">Reserved box 05</td><td class="xl-input-yellow xl-num">$0.00</td></tr>`;
+      h += `<tr><td class="excel-row-hdr">7</td><td></td><td></td><td></td><td class="xl-input-yellow xl-center">Reserved box 06</td><td class="xl-input-yellow xl-num">$0.00</td></tr>`;
+      h += `<tr><td class="excel-row-hdr">8</td><td></td><td></td><td></td><td class="xl-input-yellow xl-center">Reserved box 07</td><td class="xl-input-yellow xl-num">$0.00</td></tr>`;
+
+      h += "</tbody>";
+      return h;
+    }
+
+    // 11. EXCEL GRID CELL SELECTION & EDITING
+    function bindExcelGridInteractions() {
+      const nameBox = document.getElementById("xl-name-box");
+      const formulaBar = document.getElementById("xl-formula-bar");
+
+      document.querySelectorAll(".excel-grid-table td[data-xl-coord]").forEach((td) => {
+        td.addEventListener("click", () => {
+          document.querySelectorAll(".excel-grid-table td").forEach((c) => c.classList.remove("selected"));
+          td.classList.add("selected");
+          const coord = td.getAttribute("data-xl-coord");
+          const formula = td.getAttribute("data-formula") || td.textContent;
+          nameBox.textContent = coord;
+          formulaBar.value = formula;
+          AppState.selectedCell = { coord, sheet: AppState.activeSheet, formula };
+        });
+
+        // Double click to edit yellow input cells directly
+        if (td.classList.contains("xl-input-yellow")) {
+          td.addEventListener("dblclick", () => {
+            const field = td.getAttribute("data-xl-field");
+            const cmField = td.getAttribute("data-xl-cm");
+            const current = td.textContent.trim().replace("$", "").replace("%", "");
+            const newVal = prompt(`Edit Cell ${td.getAttribute("data-xl-coord")}:`, current);
+            if (newVal !== null && newVal.trim() !== "") {
+              if (field) {
+                if (field === "thickness" || field === "width" || field === "length") {
+                  AppState.quote[field] = parseFloat(newVal) || AppState.quote[field];
+                } else {
+                  AppState.quote[field] = newVal.trim();
+                }
+                renderAllWebInputs();
+                recalculate();
+              } else if (cmField) {
+                AppState.costModel[cmField] = parseFloat(newVal) || AppState.costModel[cmField];
+                renderAllWebInputs();
+                recalculate();
+              }
+            }
+          });
+        }
+      });
+    }
+
+    function highlightCellInExcel(coord) {
+      document.querySelectorAll(".excel-grid-table td").forEach((c) => c.classList.remove("selected"));
+      const cell = document.querySelector(`.excel-grid-table td[data-xl-coord="${coord}"]`);
+      if (cell) {
+        cell.classList.add("selected");
+        document.getElementById("xl-name-box").textContent = coord;
+        document.getElementById("xl-formula-bar").value = cell.getAttribute("data-formula") || cell.textContent;
+        cell.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+      }
+    }
+
+    // 12. SPREADSHEET REFERENCE MODAL ('?')
+    function showExcelRefModal(key) {
+      const ref = EXCEL_REF_MAP[key];
+      if (!ref) return;
+
+      document.getElementById("ref-modal-sheet").textContent = ref.sheet;
+      document.getElementById("ref-modal-coord").textContent = ref.coord;
+      document.getElementById("ref-modal-type").textContent = ref.type;
+      document.getElementById("ref-modal-formula").textContent = ref.formula;
+      document.getElementById("ref-modal-desc").textContent = ref.desc;
+
+      // Current computed value preview
+      const res = AppState.calculationResult;
+      let valStr = "";
+      if (key === "sellingPrice") valStr = `$${res.sellingPriceUnit.toFixed(2)}`;
+      else if (key === "sellingPriceSqm") valStr = `$${res.sellingPriceSqm.toFixed(2)}/sqm`;
+      else if (key === "sqmUsed") valStr = `${res.sqmUsed.toFixed(4)} sqm`;
+      else if (key === "rollLength") valStr = `${res.rollLength} in`;
+      else if (key === "preMarginCost") valStr = `$${res.costs.totalCostBeforeMargins.toFixed(2)}`;
+      else if (key === "rawMaterialJob") valStr = `$${res.costs.rawCostJob.toFixed(2)}`;
+      else if (AppState.quote[key] !== undefined) valStr = String(AppState.quote[key]);
+      else valStr = "See grid";
+
+      document.getElementById("ref-modal-val").textContent = valStr;
+      document.getElementById("excel-ref-modal").classList.add("active");
+    }
+
+    window.closeExcelRefModal = function() {
+      document.getElementById("excel-ref-modal").classList.remove("active");
+    };
+
+    // 13. NAVIGATION & VIEWS
+    function navigateToView(viewId) {
+      document.querySelectorAll(".menu-link").forEach((l) => {
+        l.classList.toggle("active", l.getAttribute("data-view") === viewId);
+      });
+      document.querySelectorAll(".page-view").forEach((p) => {
+        p.classList.toggle("active", p.id === `view-${viewId}`);
+      });
+      if (viewId === "quotes-history") renderQuotesHistory();
+      if (viewId === "quote-preview") renderPrintableQuote();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+    window.historyNavTo = navigateToView;
+
+    // 14. SAVE QUOTE & QUOTES HISTORY
+    function saveQuoteToHistory() {
+      const res = AppState.calculationResult;
+      if (!res || !res.isValid) {
+        showToast("Cannot save: Please fix dimensions first.", "warning");
+        return;
+      }
+
+      const q = {
+        id: AppState.quote.quoteId || `QT-${Date.now().toString().slice(-4)}`,
+        date: AppState.quote.date || new Date().toISOString().split("T")[0],
+        customerCode: AppState.quote.customerCode,
+        customerName: AppState.quote.customerName,
+        thickness: AppState.quote.thickness,
+        width: AppState.quote.width,
+        length: AppState.quote.length,
+        shape: AppState.quote.shape,
+        roundAngles: AppState.quote.roundAngles,
+        bevelEdges: AppState.quote.bevelEdges,
+        quantity: AppState.quote.quantity,
+        unitPrice: res.sellingPriceUnit,
+        totalPrice: res.totalOrderPrice
+      };
+
+      AppState.quotesHistory.unshift(q);
+      saveStorage();
+
+      // Bump Quote ID
+      const num = parseInt(q.id.replace(/\D/g, ""), 10) + 1;
+      AppState.quote.quoteId = `QT-2026-${String(num).padStart(4, "0")}`;
+      document.getElementById("quote-id-input").value = AppState.quote.quoteId;
+
+      showToast(`Saved quote ${q.id} for ${q.customerCode}!`);
+      renderQuotesHistory();
+    }
+
+    function renderQuotesHistory() {
+      const tbody = document.getElementById("quotes-history-tbody");
+      if (!tbody) return;
+      if (AppState.quotesHistory.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:1.5rem;color:var(--text-muted);">No saved quotes yet.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = "";
+      AppState.quotesHistory.forEach((q, idx) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><strong>${q.id}</strong></td>
+          <td><span style="background:var(--color-primary-light);color:var(--color-primary);padding:0.15rem 0.4rem;border-radius:4px;font-weight:600;">${q.customerCode}</span></td>
+          <td>${q.customerName}</td>
+          <td>${q.thickness}mm | ${q.width}" × ${q.length}" (${q.shape})</td>
+          <td>${q.quantity}</td>
+          <td><strong>$${q.totalPrice.toFixed(2)}</strong></td>
+          <td>${q.date}</td>
+          <td>
+            <button class="btn btn-sm btn-secondary" onclick="loadQuote(${idx})">Load</button>
+            <button class="btn btn-sm btn-secondary" onclick="deleteQuote(${idx})" style="color:var(--color-danger);">✕</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    window.loadQuote = function(idx) {
+      const q = AppState.quotesHistory[idx];
+      if (!q) return;
+      AppState.quote = { ...AppState.quote, ...q };
+      renderAllWebInputs();
+      recalculate();
+      navigateToView("dashboard");
+      showToast(`Loaded quote ${q.id}`);
+    };
+
+    window.deleteQuote = function(idx) {
+      if (confirm("Delete this quote?")) {
+        AppState.quotesHistory.splice(idx, 1);
+        saveStorage();
+        renderQuotesHistory();
+      }
+    };
+
+    function renderPrintableQuote() {
+      const res = AppState.calculationResult;
+      if (!res) return;
+      document.getElementById("pq-customer-info").innerHTML = `
+        <h3 style="font-size:1.05rem;font-weight:700;color:var(--text-main);margin-bottom:0.2rem;">${AppState.quote.customerName}</h3>
+        <p style="color:var(--text-muted);font-size:0.82rem;"><strong>Customer Code:</strong> ${AppState.quote.customerCode} • <strong>Quote #:</strong> ${AppState.quote.quoteId}</p>
+      `;
+      const options = [
+        AppState.quote.roundAngles === "Yes" ? "Rounded Angles (+$2.50)" : null,
+        AppState.quote.bevelEdges === "Yes" ? "Beveled Edges (+$4.00)" : null,
+        AppState.quote.shape !== "Square/Rectangle" ? `${AppState.quote.shape} (+$2.50)` : null
+      ].filter(Boolean).join(", ") || "Standard Finish";
+
+      document.getElementById("pq-items-tbody").innerHTML = `
+        <tr>
+          <td>
+            <strong>Custom PVC Surface Protection Table Cover</strong><br>
+            <span style="font-size:0.75rem;color:var(--text-muted);">
+              Size: ${AppState.quote.width}" × ${AppState.quote.length}" | Thickness: ${AppState.quote.thickness}mm | Shape: ${AppState.quote.shape}<br>
+              Finishing: ${options} | Carton: ${res.selectedBox.name}
+            </span>
+          </td>
+          <td style="text-align:right;">${res.sqmUsed.toFixed(3)} m²</td>
+          <td style="text-align:right;">${AppState.quote.quantity}</td>
+          <td style="text-align:right;">$${res.sellingPriceUnit.toFixed(2)}</td>
+          <td style="text-align:right;"><strong>$${res.totalOrderPrice.toFixed(2)}</strong></td>
+        </tr>
+      `;
+      document.getElementById("pq-subtotal").textContent = `$${res.totalOrderPrice.toFixed(2)}`;
+      document.getElementById("pq-grand-total").textContent = `$${res.totalOrderPrice.toFixed(2)}`;
+    }
+
+    // 15. TOAST HELPER
+    function showToast(msg) {
+      const t = document.getElementById("toast-container");
+      if (!t) return;
+      t.textContent = msg;
+      t.style.display = "block";
+      clearTimeout(window.__tTime);
+      window.__tTime = setTimeout(() => { t.style.display = "none"; }, 2500);
+    }
+  </script>
+
+</body>
+</html>
